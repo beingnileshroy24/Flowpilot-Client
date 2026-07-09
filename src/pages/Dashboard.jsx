@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { tasksApi } from '../api/tasks';
-import { STATIC_PROJECTS } from '../components/Sidebar';
+import { projectsApi } from '../api/projects';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import TicketModal from '../components/TicketModal';
+import ProjectModal from '../components/ProjectModal';
 import {
   FolderKanban,
   CheckCircle2,
@@ -61,18 +62,25 @@ function MetricCard({ icon: Icon, label, value, accent, sublabel }) {
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+
+  const { data: projects = [], isLoading: isLoadingProjects } = useQuery({
+    queryKey: ['projects'],
+    queryFn: projectsApi.getProjects,
+  });
 
   const projectQueries = useQueries({
-    queries: STATIC_PROJECTS.map((proj) => ({
+    queries: projects.map((proj) => ({
       queryKey: ['tasks', proj.id],
       queryFn: () => tasksApi.getTasks(proj.id),
+      enabled: !!proj.id,
     })),
   });
 
-  const isLoading = projectQueries.some((q) => q.isLoading);
+  const isLoading = isLoadingProjects || projectQueries.some((q) => q.isLoading);
 
-  const projectsData = STATIC_PROJECTS.map((proj, idx) => {
-    const tasks = projectQueries[idx].data || [];
+  const projectsData = projects.map((proj, idx) => {
+    const tasks = projectQueries[idx]?.data || [];
     const total = tasks.length;
     const done = tasks.filter((t) => t.status === 'DONE').length;
     const progress = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
@@ -107,10 +115,16 @@ export default function Dashboard() {
                 Cross-project operational telemetry
               </p>
             </div>
-            <button onClick={() => setIsModalOpen(true)} className="btn-primary text-sm">
-              <Plus size={16} />
-              Raise Ticket
-            </button>
+            <div className="flex items-center gap-2.5">
+              <button onClick={() => setIsProjectModalOpen(true)} className="btn-secondary text-sm">
+                <Plus size={16} />
+                New Project
+              </button>
+              <button onClick={() => setIsModalOpen(true)} className="btn-primary text-sm">
+                <Plus size={16} />
+                Raise Ticket
+              </button>
+            </div>
           </div>
 
           {/* Metric Cards */}
@@ -246,6 +260,7 @@ export default function Dashboard() {
       </div>
 
       <TicketModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <ProjectModal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} />
     </div>
   );
 }

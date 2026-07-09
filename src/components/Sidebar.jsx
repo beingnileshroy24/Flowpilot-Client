@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { projectsApi } from '../api/projects';
 import { logout } from '../store/authSlice';
 import {
   LayoutDashboard,
@@ -13,11 +15,7 @@ import {
 
 import logoImg from '../assets/logo.png';
 
-export const STATIC_PROJECTS = [
-  { id: 'flowpilot-core', name: 'FlowPilot Core', desc: 'Core React/FastAPI workspace' },
-  { id: 'ai-agent-engine', name: 'AI Engine', desc: 'DeepMind models & routing' },
-  { id: 'analytics-portal', name: 'Client Portal', desc: 'Telemetry & analytics' },
-];
+export const STATIC_PROJECTS = [];
 
 const PROJECT_COLORS = ['#f59e0b', '#3b82f6', '#a855f7'];
 
@@ -27,6 +25,11 @@ export default function Sidebar() {
   const location = useLocation();
   const user = useSelector((state) => state.auth.user);
   const [collapsed, setCollapsed] = useState(false);
+
+  const { data: projects = [] } = useQuery({
+    queryKey: ['projects'],
+    queryFn: projectsApi.getProjects,
+  });
 
   const handleLogout = () => {
     dispatch(logout());
@@ -154,7 +157,7 @@ export default function Sidebar() {
         )}
         {collapsed && <div className="my-2 mx-2 h-px" style={{ background: 'var(--border)' }} />}
 
-        {STATIC_PROJECTS.map((proj, idx) => (
+        {projects.map((proj, idx) => (
           <NavItem
             key={proj.id}
             to={`/project/${proj.id}`}
@@ -162,7 +165,7 @@ export default function Sidebar() {
             label={proj.name}
             active={isProjectActive(proj.id)}
             collapsed={collapsed}
-            accentColor={PROJECT_COLORS[idx]}
+            accentColor={PROJECT_COLORS[idx % PROJECT_COLORS.length]}
           />
         ))}
       </nav>

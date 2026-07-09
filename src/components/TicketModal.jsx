@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
 import { usersApi } from '../api/users';
 import { tasksApi } from '../api/tasks';
-import { STATIC_PROJECTS } from './Sidebar';
+import { projectsApi } from '../api/projects';
 import Modal from './Modal';
 import { AlertCircle, Loader, ShieldOff } from 'lucide-react';
 
@@ -55,7 +55,7 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
   const queryClient = useQueryClient();
   const currentUser = useSelector((state) => state.auth.user);
 
-  const [projectId, setProjectId] = useState(defaultProjectId || STATIC_PROJECTS[0].id);
+  const [projectId, setProjectId] = useState(defaultProjectId || '');
   const [type, setType] = useState('TASK');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -65,9 +65,15 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
   const [tagsInput, setTagsInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const { data: projects = [] } = useQuery({
+    queryKey: ['projects'],
+    queryFn: projectsApi.getProjects,
+    enabled: isOpen,
+  });
+
   useEffect(() => {
     if (isOpen) {
-      setProjectId(defaultProjectId || STATIC_PROJECTS[0].id);
+      setProjectId(defaultProjectId || projects[0]?.id || '');
       setType('TASK');
       setTitle('');
       setDescription('');
@@ -77,7 +83,7 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
       setTagsInput('');
       setErrorMsg('');
     }
-  }, [isOpen, defaultProjectId]);
+  }, [isOpen, defaultProjectId, projects]);
 
   const { data: users = [], isLoading: loadingUsers } = useQuery({
     queryKey: ['users'],
@@ -163,7 +169,7 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
               className="form-select"
               required
             >
-              {STATIC_PROJECTS.map((p) => (
+              {projects.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>

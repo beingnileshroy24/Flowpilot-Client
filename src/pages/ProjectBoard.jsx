@@ -3,12 +3,33 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { tasksApi } from '../api/tasks';
-import { STATIC_PROJECTS } from '../components/Sidebar';
+import { projectsApi } from '../api/projects';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import TaskCard from '../components/TaskCard';
+import EditProjectModal from '../components/EditProjectModal';
 import TicketModal from '../components/TicketModal';
-import { Plus, Search, Filter, ArrowLeft, Loader, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Filter, ArrowLeft, Loader, AlertTriangle, Settings } from 'lucide-react';
+
+function GithubIcon({ size = 16, className = "" }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+      <path d="M9 18c-4.51 2-5-2-7-2" />
+    </svg>
+  );
+}
 
 const COLUMNS = [
   { id: 'TODO',        title: 'Backlog',     accent: '#94a3b8' },
@@ -23,12 +44,13 @@ export default function ProjectBoard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
 
-  const currentProject = STATIC_PROJECTS.find((p) => p.id === projectId) || {
-    id: projectId,
-    name: 'Project Board',
-    desc: 'Custom workspace',
-  };
+  const { data: currentProject = { name: 'Project Board', desc: '' } } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: () => projectsApi.getProject(projectId),
+    enabled: !!projectId,
+  });
 
   const { data: tasks = [], isLoading, isError, error } = useQuery({
     queryKey: ['tasks', projectId],
@@ -146,6 +168,16 @@ export default function ProjectBoard() {
                 </select>
               </div>
 
+              {/* Configure Project */}
+              <button
+                onClick={() => setIsEditProjectModalOpen(true)}
+                className="btn-secondary text-sm flex items-center gap-1.5"
+                title="Configure project repository and server details"
+              >
+                <Settings size={15} />
+                Configure
+              </button>
+
               {/* Add ticket */}
               <button onClick={() => setIsModalOpen(true)} className="btn-primary text-sm">
                 <Plus size={16} />
@@ -153,6 +185,114 @@ export default function ProjectBoard() {
               </button>
             </div>
           </div>
+
+          {/* Project Details / Metadata Ribbon */}
+          {(currentProject.github_frontend || currentProject.github_backend || currentProject.test_server || currentProject.prod_server || currentProject.test_mongodb_url || currentProject.prod_mongodb_url) && (
+            <div
+              className="p-3.5 rounded-2xl flex flex-wrap items-center gap-x-6 gap-y-2.5 text-xs shrink-0 animate-fade-in"
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
+              {/* Description */}
+              {currentProject.description && (
+                <div className="text-[11px] font-medium pr-4 border-r" style={{ color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
+                  {currentProject.description}
+                </div>
+              )}
+
+              {/* GitHub Repos */}
+              {(currentProject.github_frontend || currentProject.github_backend) && (
+                <div className="flex items-center gap-2 border-r pr-4" style={{ borderColor: 'var(--border)' }}>
+                  <span className="font-bold uppercase tracking-wider text-[10px]" style={{ color: 'var(--text-muted)' }}>Repos:</span>
+                  {currentProject.github_frontend && (
+                    <a
+                      href={currentProject.github_frontend}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline flex items-center gap-1 font-semibold"
+                      style={{ color: '#3b82f6' }}
+                    >
+                      <GithubIcon size={12} /> Frontend
+                    </a>
+                  )}
+                  {currentProject.github_backend && (
+                    <a
+                      href={currentProject.github_backend}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline flex items-center gap-1 font-semibold"
+                      style={{ color: '#3b82f6' }}
+                    >
+                      <GithubIcon size={12} /> Backend
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Servers */}
+              {(currentProject.test_server || currentProject.prod_server) && (
+                <div className="flex items-center gap-2 border-r pr-4" style={{ borderColor: 'var(--border)' }}>
+                  <span className="font-bold uppercase tracking-wider text-[10px]" style={{ color: 'var(--text-muted)' }}>Servers:</span>
+                  {currentProject.test_server && (
+                    <a
+                      href={currentProject.test_server}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline flex items-center gap-1 font-semibold"
+                      style={{ color: '#f59e0b' }}
+                    >
+                      Staging
+                    </a>
+                  )}
+                  {currentProject.prod_server && (
+                    <a
+                      href={currentProject.prod_server}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline flex items-center gap-1 font-semibold"
+                      style={{ color: '#22c55e' }}
+                    >
+                      Production
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Mongo Details */}
+              {(currentProject.test_mongodb_url || currentProject.prod_mongodb_url) && (
+                <div className="flex items-center gap-2">
+                  <span className="font-bold uppercase tracking-wider text-[10px]" style={{ color: 'var(--text-muted)' }}>MongoDB Connection:</span>
+                  {currentProject.test_mongodb_url && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentProject.test_mongodb_url);
+                        alert('Staging MongoDB connection string copied to clipboard!');
+                      }}
+                      className="hover:underline flex items-center gap-1 font-semibold text-left cursor-pointer"
+                      style={{ color: '#3b82f6' }}
+                    >
+                      Copy Test URI
+                    </button>
+                  )}
+                  {currentProject.prod_mongodb_url && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentProject.prod_mongodb_url);
+                        alert('Production MongoDB connection string copied to clipboard!');
+                      }}
+                      className="hover:underline flex items-center gap-1 font-semibold text-left cursor-pointer"
+                      style={{ color: '#22c55e' }}
+                    >
+                      Copy Prod URI
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Kanban Body */}
           {isLoading ? (
@@ -269,6 +409,11 @@ export default function ProjectBoard() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         defaultProjectId={projectId}
+      />
+      <EditProjectModal
+        isOpen={isEditProjectModalOpen}
+        onClose={() => setIsEditProjectModalOpen(false)}
+        project={currentProject}
       />
     </div>
   );
