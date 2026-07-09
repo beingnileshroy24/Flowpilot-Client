@@ -243,20 +243,29 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
 
           {/* Assignee + Hours */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="form-label">Assignee</label>
-              <select
-                value={assignedToId}
-                onChange={(e) => setAssignedToId(e.target.value)}
-                className="form-select"
-                disabled={loadingUsers}
-              >
-                <option value="">Unassigned</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                ))}
-              </select>
-            </div>
+            {currentUser?.role !== 'CLIENT' && currentUser?.role !== 'MANAGER' ? (
+              <div>
+                <label className="form-label">Assignee</label>
+                <select
+                  value={assignedToId}
+                  onChange={(e) => setAssignedToId(e.target.value)}
+                  className="form-select"
+                  disabled={loadingUsers}
+                >
+                  <option value="">Unassigned</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="form-label">Assignee</label>
+                <div className="glass-input w-full rounded-xl px-4 py-2.5 text-xs text-amber-500/80 font-medium select-none">
+                  Assigned to Project Lead
+                </div>
+              </div>
+            )}
             <div>
               <label className="form-label">Est. Hours</label>
               <input

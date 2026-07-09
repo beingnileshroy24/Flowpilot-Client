@@ -16,11 +16,23 @@ const TYPE_STYLES = {
   BUG:     { bg: 'rgba(239,68,68,0.10)',   text: '#dc2626', border: 'rgba(239,68,68,0.22)',  icon: Bug },
 };
 
-export default function TaskCard({ task, index, onClick }) {
+export default function TaskCard({ task, index, onClick, currentUser, project, projectMembers = [], onAssign }) {
   const priority = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.MEDIUM;
   const typeStyle = TYPE_STYLES[task.type] || TYPE_STYLES.TASK;
   const TypeIcon = typeStyle.icon;
   const assigneeName = task.assigned_to?.name || null;
+
+  const isLead = currentUser?.id === project?.lead_developer_id;
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const isDevInProject = project?.developer_ids?.includes(currentUser?.id);
+  const canAssign = isAdmin || isLead || isDevInProject;
+
+  let assignOptions = [];
+  if (isAdmin || isLead) {
+    assignOptions = projectMembers;
+  } else if (isDevInProject) {
+    assignOptions = projectMembers.filter(u => u.id === currentUser?.id);
+  }
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -155,30 +167,64 @@ export default function TaskCard({ task, index, onClick }) {
             )}
 
             {/* Assignee avatar */}
-            {assigneeName ? (
-              <div
-                className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold"
-                title={assigneeName}
-                style={{
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  color: '#0f172a',
-                  boxShadow: '0 2px 6px rgba(245,158,11,0.30)',
-                }}
-              >
-                {assigneeName.charAt(0).toUpperCase()}
-              </div>
-            ) : (
-              <div
-                className="w-6 h-6 rounded-lg flex items-center justify-center"
-                style={{
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-muted)',
-                }}
-              >
-                <User2 size={11} />
-              </div>
-            )}
+            <div className="relative group cursor-pointer">
+              {assigneeName ? (
+                <div
+                  className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold"
+                  title={assigneeName}
+                  style={{
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    color: '#0f172a',
+                    boxShadow: '0 2px 6px rgba(245,158,11,0.30)',
+                  }}
+                >
+                  {assigneeName.charAt(0).toUpperCase()}
+                </div>
+              ) : (
+                <div
+                  className="w-6 h-6 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  <User2 size={11} />
+                </div>
+              )}
+
+              {canAssign && (
+                <select
+                  value={task.assigned_to_id || ''}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    if (onAssign) {
+                      onAssign(e.target.value || null);
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs"
+                  title="Change assignment"
+                >
+                  <option value="">Unassigned</option>
+                  {isAdmin || isLead ? (
+                    assignOptions.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} {u.id === currentUser?.id ? '(Me)' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      {task.assigned_to_id === currentUser?.id ? (
+                        <option value="">Unassign Me</option>
+                      ) : (
+                        <option value={currentUser?.id}>Claim Task</option>
+                      )}
+                    </>
+                  )}
+                </select>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -5,11 +5,13 @@ import { useSelector } from 'react-redux';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { tasksApi } from '../api/tasks';
 import { projectsApi } from '../api/projects';
+import { usersApi } from '../api/users';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import TaskCard from '../components/TaskCard';
 import EditProjectModal from '../components/EditProjectModal';
 import TicketModal from '../components/TicketModal';
+import TaskDetailModal from '../components/TaskDetailModal';
 import { Plus, Search, Filter, ArrowLeft, Loader, AlertTriangle, Settings } from 'lucide-react';
 
 function GithubIcon({ size = 16, className = "" }) {
@@ -46,6 +48,7 @@ export default function ProjectBoard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
   const currentUser = useSelector((state) => state.auth.user);
 
   const { data: currentProject = { name: 'Project Board', desc: '' } } = useQuery({
@@ -65,10 +68,25 @@ export default function ProjectBoard() {
     queryFn: () => tasksApi.getTasks(projectId),
   });
 
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: usersApi.listUsers,
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: ({ taskId, status }) => tasksApi.updateTaskStatus(taskId, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] }),
   });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ taskId, payload }) => tasksApi.updateTaskDetails(taskId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] }),
+  });
+
+  const projectMembers = users.filter((u) =>
+    u.id === currentProject?.lead_developer_id ||
+    (currentProject?.developer_ids && currentProject.developer_ids.includes(u.id))
+  );
 
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
@@ -399,7 +417,21 @@ export default function ProjectBoard() {
                               </div>
                             ) : (
                               colTasks.map((task, idx) => (
-                                <TaskCard key={task.id} task={task} index={idx} />
+                                <TaskCard
+                                  key={task.id}
+                                  task={task}
+                                  index={idx}
+                                  onClick={() => setSelectedTask(task)}
+                                  currentUser={currentUser}
+                                  project={currentProject}
+                                  projectMembers={projectMembers}
+                                  onAssign={(assignedToId) =>
+                                    updateTaskMutation.mutate({
+                                      taskId: task.id,
+                                      payload: { assigned_to_id: assignedToId || null }
+                                    })
+                                  }
+                                />
                               ))
                             )}
                             {provided.placeholder}
@@ -424,6 +456,26 @@ export default function ProjectBoard() {
         isOpen={isEditProjectModalOpen}
         onClose={() => setIsEditProjectModalOpen(false)}
         project={currentProject}
+      />
+      <TaskDetailModal
+        isOpen={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        task={selectedTask}
+        currentUser={currentUser}
+        project={currentProject}
+        projectMembers={projectMembers}
+        onAssign={async (assignedToId) => {
+          await updateTaskMutation.mutateAsync({
+            taskId: selectedTask.id,
+            payload: { assigned_to_id: assignedToId || null }
+          });
+          const member = projectMembers.find(u => u.id === assignedToId);
+          setSelectedTask(prev => ({
+            ...prev,
+            assigned_to_id: assignedToId,
+            assigned_to: member || null
+          }));
+        }}
       />
     </div>
   );
