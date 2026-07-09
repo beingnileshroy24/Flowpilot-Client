@@ -6,22 +6,62 @@ import { STATIC_PROJECTS } from '../components/Sidebar';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import TicketModal from '../components/TicketModal';
-import { 
-  FolderKanban, 
-  CheckCircle2, 
-  CircleDot, 
-  Clock, 
-  Plus, 
-  ArrowRight,
-  TrendingUp,
+import {
+  FolderKanban,
+  CheckCircle2,
   Activity,
-  Layers
+  Clock,
+  Plus,
+  ArrowRight,
+  CircleDot,
+  Layers,
 } from 'lucide-react';
+
+const PROJECT_ACCENT_COLORS = ['#f59e0b', '#3b82f6', '#a855f7'];
+
+function MetricCard({ icon: Icon, label, value, accent, sublabel }) {
+  return (
+    <div
+      className="rounded-2xl p-5 transition-all duration-200 hover:scale-[1.01] relative overflow-hidden"
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
+      {/* Glow orb */}
+      <div
+        className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none"
+        style={{ background: `radial-gradient(circle, ${accent}15 0%, transparent 70%)`, transform: 'translate(30%, -30%)' }}
+      />
+      <div className="flex items-start justify-between mb-3 relative z-10">
+        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          {label}
+        </span>
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center"
+          style={{ background: `${accent}18`, border: `1px solid ${accent}28` }}
+        >
+          <Icon size={18} style={{ color: accent }} />
+        </div>
+      </div>
+      <div className="flex items-baseline gap-2 relative z-10">
+        <span className="text-3xl font-extrabold tracking-tight" style={{ color: 'var(--text)' }}>
+          {value}
+        </span>
+        {sublabel && (
+          <span className="text-xs font-semibold" style={{ color: accent }}>
+            {sublabel}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch tasks for all projects in parallel
   const projectQueries = useQueries({
     queries: STATIC_PROJECTS.map((proj) => ({
       queryKey: ['tasks', proj.id],
@@ -31,204 +71,181 @@ export default function Dashboard() {
 
   const isLoading = projectQueries.some((q) => q.isLoading);
 
-  // Process data for dashboard metrics
   const projectsData = STATIC_PROJECTS.map((proj, idx) => {
     const tasks = projectQueries[idx].data || [];
     const total = tasks.length;
-    const todo = tasks.filter((t) => t.status === 'TODO').length;
+    const done = tasks.filter((t) => t.status === 'DONE').length;
     const progress = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
     const review = tasks.filter((t) => t.status === 'IN_REVIEW').length;
-    const done = tasks.filter((t) => t.status === 'DONE').length;
-    const hours = tasks.reduce((sum, t) => sum + (t.estimated_hours || 0), 0);
-    const completionRate = total > 0 ? Math.round((done / total) * 100) : 0;
-
-    return {
-      ...proj,
-      total,
-      todo,
-      progress,
-      review,
-      done,
-      hours,
-      completionRate,
-    };
+    const todo = tasks.filter((t) => t.status === 'TODO').length;
+    const hours = tasks.reduce((s, t) => s + (t.estimated_hours || 0), 0);
+    const rate = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { ...proj, total, done, progress, review, todo, hours, rate };
   });
 
-  // Aggregated metrics
-  const totalTasks = projectsData.reduce((sum, p) => sum + p.total, 0);
-  const completedTasks = projectsData.reduce((sum, p) => sum + p.done, 0);
-  const inProgressTasks = projectsData.reduce((sum, p) => sum + p.progress + p.review, 0);
-  const totalHours = projectsData.reduce((sum, p) => sum + p.hours, 0);
-  const overallCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const totalTasks = projectsData.reduce((s, p) => s + p.total, 0);
+  const totalDone  = projectsData.reduce((s, p) => s + p.done, 0);
+  const totalWIP   = projectsData.reduce((s, p) => s + p.progress + p.review, 0);
+  const totalHours = projectsData.reduce((s, p) => s + p.hours, 0);
+  const overallRate = totalTasks > 0 ? Math.round((totalDone / totalTasks) * 100) : 0;
 
   return (
-    <div className="flex h-screen bg-brand-bg text-brand-text overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        <Header title="Projects Dashboard" />
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <Header title="Dashboard" />
 
-        <main className="p-8 space-y-8 flex-1">
-          {/* Header Action block */}
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-8">
+          {/* Page Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-extrabold tracking-tight text-white">Workspace Overview</h2>
-              <p className="text-sm text-brand-textMuted mt-1">Cross-project task telemetry & operational status</p>
+              <h2 className="text-xl font-extrabold tracking-tight" style={{ color: 'var(--text)' }}>
+                Workspace Overview
+              </h2>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Cross-project operational telemetry
+              </p>
             </div>
-            
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-brand-primary to-indigo-600 hover:from-brand-primaryHover hover:to-indigo-700 px-5 py-2.5 rounded-lg text-sm font-semibold text-white shadow-glow-primary hover:shadow-glow-secondary transition-all"
-            >
-              <Plus size={18} />
-              Raise New Ticket
+            <button onClick={() => setIsModalOpen(true)} className="btn-primary text-sm">
+              <Plus size={16} />
+              Raise Ticket
             </button>
           </div>
 
-          {/* Aggregated Metric Stats Row */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {/* Stat: Total Tickets */}
-            <div className="glassmorphism p-6 rounded-xl border border-white/5 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full blur-2xl group-hover:bg-brand-primary/10 transition-colors" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-brand-textMuted uppercase tracking-wider">Total Tasks</span>
-                <div className="p-2 bg-brand-primary/10 rounded-lg text-brand-primary">
-                  <Layers size={18} />
-                </div>
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-white">{isLoading ? '...' : totalTasks}</span>
-                <span className="text-xs text-brand-textMuted">active issues</span>
-              </div>
-            </div>
-
-            {/* Stat: Completed Tickets */}
-            <div className="glassmorphism p-6 rounded-xl border border-white/5 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-secondary/5 rounded-full blur-2xl group-hover:bg-brand-secondary/10 transition-colors" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-brand-textMuted uppercase tracking-wider">Completed</span>
-                <div className="p-2 bg-brand-secondary/10 rounded-lg text-brand-secondary">
-                  <CheckCircle2 size={18} />
-                </div>
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-white">{isLoading ? '...' : completedTasks}</span>
-                <span className="text-xs text-brand-secondary font-semibold">
-                  {isLoading ? '' : `${overallCompletionRate}% Rate`}
-                </span>
-              </div>
-            </div>
-
-            {/* Stat: Work In Progress */}
-            <div className="glassmorphism p-6 rounded-xl border border-white/5 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-colors" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-brand-textMuted uppercase tracking-wider">Active WIP</span>
-                <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
-                  <Activity size={18} />
-                </div>
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-white">{isLoading ? '...' : inProgressTasks}</span>
-                <span className="text-xs text-brand-textMuted">developing/reviewing</span>
-              </div>
-            </div>
-
-            {/* Stat: Total Hours Allocated */}
-            <div className="glassmorphism p-6 rounded-xl border border-white/5 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-colors" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-brand-textMuted uppercase tracking-wider">Backlog Effort</span>
-                <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
-                  <Clock size={18} />
-                </div>
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-white">{isLoading ? '...' : totalHours}h</span>
-                <span className="text-xs text-brand-textMuted">estimated effort</span>
-              </div>
-            </div>
+          {/* Metric Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <MetricCard icon={Layers}       label="Total Tasks"   value={isLoading ? '—' : totalTasks} accent="#f59e0b" />
+            <MetricCard icon={CheckCircle2} label="Completed"     value={isLoading ? '—' : totalDone}  accent="#22c55e" sublabel={isLoading ? '' : `${overallRate}%`} />
+            <MetricCard icon={Activity}     label="Active WIP"    value={isLoading ? '—' : totalWIP}   accent="#3b82f6" />
+            <MetricCard icon={Clock}        label="Effort (hrs)"  value={isLoading ? '—' : `${totalHours}h`} accent="#a855f7" />
           </div>
 
-          {/* Project List */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white tracking-wide">Allocated Workspaces</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {projectsData.map((proj) => (
-                <div 
-                  key={proj.id}
-                  className="glassmorphism rounded-xl border border-white/5 hover:border-white/10 transition-all flex flex-col p-6 group shadow-sm hover:shadow-glow-primary"
-                >
-                  {/* Card Title */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-2.5 bg-brand-primary/10 rounded-lg text-brand-primary group-hover:bg-brand-primary group-hover:text-white transition-all">
-                      <FolderKanban size={22} />
-                    </div>
-                    <span className="text-[10px] bg-white/5 border border-white/10 text-brand-textMuted px-2 py-0.5 rounded font-mono uppercase">
-                      Active
-                    </span>
-                  </div>
+          {/* Projects Grid */}
+          <div>
+            <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>
+              Active Projects
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {projectsData.map((proj, idx) => {
+                const accent = PROJECT_ACCENT_COLORS[idx];
+                return (
+                  <div
+                    key={proj.id}
+                    className="rounded-2xl p-5 flex flex-col transition-all duration-200 hover:scale-[1.01] relative overflow-hidden group"
+                    style={{
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      boxShadow: 'var(--shadow-sm)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow = `var(--shadow), 0 0 24px ${accent}20`;
+                      e.currentTarget.style.borderColor = `${accent}35`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                    }}
+                  >
+                    {/* Top color accent strip */}
+                    <div
+                      className="absolute top-0 left-0 right-0 h-0.5"
+                      style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)`, opacity: 0.6 }}
+                    />
 
-                  <h4 className="text-lg font-bold text-white tracking-wide">{proj.name}</h4>
-                  <p className="text-xs text-brand-textMuted mt-1 line-clamp-2 min-h-[32px]">
-                    {proj.desc}
-                  </p>
-
-                  {/* Micro stats table */}
-                  <div className="grid grid-cols-2 gap-y-3 gap-x-2 py-4 my-4 border-t border-b border-white/5 text-xs">
-                    <div className="flex items-center gap-1.5 text-brand-textMuted">
-                      <CircleDot size={13} className="text-brand-primary" />
-                      <span>Backlog:</span>
-                      <span className="font-semibold text-white ml-auto">{isLoading ? '..' : proj.todo}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-brand-textMuted">
-                      <Activity size={13} className="text-amber-500" />
-                      <span>WIP:</span>
-                      <span className="font-semibold text-white ml-auto">{isLoading ? '..' : proj.progress + proj.review}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-brand-textMuted col-span-2">
-                      <CheckCircle2 size={13} className="text-brand-secondary" />
-                      <span>Completed:</span>
-                      <span className="font-semibold text-brand-secondary ml-auto">
-                        {isLoading ? '..' : `${proj.done} / ${proj.total}`}
+                    {/* Icon + Status */}
+                    <div className="flex items-start justify-between mb-4 pt-1">
+                      <div
+                        className="w-11 h-11 rounded-xl flex items-center justify-center"
+                        style={{
+                          background: `${accent}18`,
+                          border: `1px solid ${accent}28`,
+                          boxShadow: `0 4px 12px ${accent}20`,
+                        }}
+                      >
+                        <FolderKanban size={22} style={{ color: accent }} />
+                      </div>
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                        style={{
+                          background: 'rgba(34,197,94,0.10)',
+                          color: '#16a34a',
+                          border: '1px solid rgba(34,197,94,0.20)',
+                        }}
+                      >
+                        Active
                       </span>
                     </div>
-                  </div>
 
-                  {/* Progress bar */}
-                  <div className="space-y-1.5 mb-6">
-                    <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-brand-textMuted">Completion</span>
-                      <span className="text-brand-secondary">{isLoading ? '...' : `${proj.completionRate}%`}</span>
-                    </div>
-                    <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
-                      <div 
-                        className="bg-gradient-to-r from-brand-primary to-brand-secondary h-full rounded-full transition-all duration-500"
-                        style={{ width: `${isLoading ? 0 : proj.completionRate}%` }}
-                      />
-                    </div>
-                  </div>
+                    {/* Name + Desc */}
+                    <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>{proj.name}</h4>
+                    <p className="text-xs mb-4 line-clamp-2 flex-1" style={{ color: 'var(--text-muted)' }}>
+                      {proj.desc}
+                    </p>
 
-                  {/* Action Link */}
-                  <Link
-                    to={`/project/${proj.id}`}
-                    className="mt-auto w-full py-2.5 bg-white/5 hover:bg-brand-primary text-brand-textMuted hover:text-white rounded-lg text-sm font-semibold transition-all border border-white/5 flex items-center justify-center gap-2 group-hover:border-brand-primary/20"
-                  >
-                    Open Kanban Board
-                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                </div>
-              ))}
+                    {/* Mini metrics */}
+                    <div
+                      className="grid grid-cols-3 gap-2 py-3 mb-4 text-center"
+                      style={{ borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}
+                    >
+                      {[
+                        { label: 'Backlog', val: proj.todo },
+                        { label: 'WIP',     val: proj.progress + proj.review },
+                        { label: 'Done',    val: proj.done },
+                      ].map((m) => (
+                        <div key={m.label}>
+                          <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+                            {isLoading ? '–' : m.val}
+                          </div>
+                          <div className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                            {m.label}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="mb-4">
+                      <div className="flex justify-between text-xs font-semibold mb-1.5">
+                        <span style={{ color: 'var(--text-muted)' }}>Progress</span>
+                        <span style={{ color: accent }}>{isLoading ? '—' : `${proj.rate}%`}</span>
+                      </div>
+                      <div
+                        className="w-full h-1.5 rounded-full overflow-hidden"
+                        style={{ background: 'var(--border)' }}
+                      >
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${isLoading ? 0 : proj.rate}%`,
+                            background: `linear-gradient(90deg, ${accent}, ${accent}cc)`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Open Board CTA */}
+                    <Link
+                      to={`/project/${proj.id}`}
+                      className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-bold transition-all duration-200 group-hover:scale-[1.01]"
+                      style={{
+                        background: `${accent}12`,
+                        color: accent,
+                        border: `1px solid ${accent}25`,
+                      }}
+                    >
+                      Open Kanban Board
+                      <ArrowRight size={13} />
+                    </Link>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </main>
       </div>
 
-      {/* Raise Ticket Modal */}
-      <TicketModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-      />
+      <TicketModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

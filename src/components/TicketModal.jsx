@@ -5,13 +5,56 @@ import { usersApi } from '../api/users';
 import { tasksApi } from '../api/tasks';
 import { STATIC_PROJECTS } from './Sidebar';
 import Modal from './Modal';
-import { AlertCircle, Loader } from 'lucide-react';
+import { AlertCircle, Loader, ShieldOff } from 'lucide-react';
+
+const TASK_TYPES = ['TASK', 'EPIC', 'BUG', 'SUBTASK'];
+const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+const TYPE_COLORS = {
+  TASK:    { active: '#3b82f6', bg: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.30)' },
+  EPIC:    { active: '#a855f7', bg: 'rgba(168,85,247,0.12)',  border: 'rgba(168,85,247,0.30)' },
+  BUG:     { active: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.30)'  },
+  SUBTASK: { active: '#06b6d4', bg: 'rgba(6,182,212,0.12)',   border: 'rgba(6,182,212,0.30)'  },
+};
+
+const PRIORITY_COLORS = {
+  LOW:      { active: '#22c55e', bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.30)'  },
+  MEDIUM:   { active: '#3b82f6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.30)' },
+  HIGH:     { active: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.30)' },
+  CRITICAL: { active: '#ef4444', bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.30)'  },
+};
+
+function PillSelector({ options, value, onChange, colorMap }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => {
+        const colors = colorMap[opt];
+        const isSelected = value === opt;
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onChange(opt)}
+            className="px-3 py-1 rounded-xl text-xs font-bold uppercase tracking-wide transition-all duration-150 hover:scale-105"
+            style={{
+              background: isSelected ? colors.bg : 'var(--surface)',
+              color: isSelected ? colors.active : 'var(--text-muted)',
+              border: `1px solid ${isSelected ? colors.border : 'var(--border)'}`,
+              boxShadow: isSelected ? `0 0 10px ${colors.bg}` : 'none',
+            }}
+          >
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
   const queryClient = useQueryClient();
   const currentUser = useSelector((state) => state.auth.user);
 
-  // Form State
   const [projectId, setProjectId] = useState(defaultProjectId || STATIC_PROJECTS[0].id);
   const [type, setType] = useState('TASK');
   const [title, setTitle] = useState('');
@@ -22,11 +65,9 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
   const [tagsInput, setTagsInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Update default project id when it changes or modal opens
   useEffect(() => {
     if (isOpen) {
       setProjectId(defaultProjectId || STATIC_PROJECTS[0].id);
-      // Reset form
       setType('TASK');
       setTitle('');
       setDescription('');
@@ -38,212 +79,199 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
     }
   }, [isOpen, defaultProjectId]);
 
-  // Fetch users for the assignee dropdown list
   const { data: users = [], isLoading: loadingUsers } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.listUsers,
     enabled: isOpen,
   });
 
-  // Task creation mutation
   const createTaskMutation = useMutation({
     mutationFn: tasksApi.createTask,
-    onSuccess: (data) => {
-      // Invalidate both general dashboard tasks query and specific project tasks query
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       onClose();
     },
     onError: (err) => {
-      setErrorMsg(err.response?.data?.detail || 'Failed to create task. Please verify your fields.');
+      setErrorMsg(err.response?.data?.detail || 'Failed to create ticket. Please check your fields.');
     },
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrorMsg('');
-
     if (title.trim().length < 3) {
       setErrorMsg('Title must be at least 3 characters.');
       return;
     }
-
-    const payload = {
+    createTaskMutation.mutate({
       project_id: projectId,
       type,
       title: title.trim(),
       description: description.trim(),
       priority,
       assigned_to_id: assignedToId || null,
-      estimated_hours: Number(estimatedHours) || 0.0,
+      estimated_hours: Number(estimatedHours) || 0,
       tags: tagsInput ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [],
-    };
-
-    createTaskMutation.mutate(payload);
+    });
   };
 
-  const canCreate = currentUser?.role === 'MANAGER' || currentUser?.role === 'CLIENT' || currentUser?.role === 'ADMIN';
+  const canCreate = ['MANAGER', 'CLIENT', 'ADMIN'].includes(currentUser?.role);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Raise New Issue / Task">
+    <Modal isOpen={isOpen} onClose={onClose} title="Raise New Issue" size="md">
       {!canCreate ? (
-        <div className="flex flex-col items-center gap-3 p-6 text-center">
-          <AlertCircle className="text-amber-500 w-12 h-12" />
-          <h4 className="text-lg font-bold text-white">Access Denied</h4>
-          <p className="text-sm text-brand-textMuted max-w-sm">
-            Only Clients, Managers, and Admins are authorized to create new tickets in FlowPilot.
-          </p>
-          <button 
-            type="button" 
-            onClick={onClose}
-            className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/15 text-white rounded-lg text-sm transition-colors border border-white/5 font-semibold"
+        <div className="flex flex-col items-center gap-4 py-8 text-center">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)' }}
           >
-            Close
-          </button>
+            <ShieldOff size={28} style={{ color: '#d97706' }} />
+          </div>
+          <div>
+            <h4 className="text-base font-bold mb-1" style={{ color: 'var(--text)' }}>
+              Permission Required
+            </h4>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Only Managers, Clients, and Admins can raise tickets.
+            </p>
+          </div>
+          <button onClick={onClose} className="btn-secondary mt-2">Close</button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Error */}
           {errorMsg && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs flex items-center gap-2">
+            <div
+              className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm"
+              style={{
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.20)',
+                color: '#dc2626',
+              }}
+            >
               <AlertCircle size={16} className="shrink-0" />
-              <span>{errorMsg}</span>
+              {errorMsg}
             </div>
           )}
 
-          {/* Project selection */}
+          {/* Project */}
           <div>
-            <label className="block text-xs font-semibold text-brand-textMuted uppercase mb-1">Project</label>
+            <label className="form-label">Project</label>
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-primary"
+              className="form-select"
               required
             >
               {STATIC_PROJECTS.map((p) => (
-                <option key={p.id} value={p.id} className="bg-brand-bg text-white">
-                  {p.name}
-                </option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Task Type */}
-            <div>
-              <label className="block text-xs font-semibold text-brand-textMuted uppercase mb-1">Type</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-primary"
-              >
-                <option value="TASK" className="bg-brand-bg text-white">TASK</option>
-                <option value="EPIC" className="bg-brand-bg text-white">EPIC</option>
-                <option value="BUG" className="bg-brand-bg text-white">BUG</option>
-                <option value="SUBTASK" className="bg-brand-bg text-white">SUBTASK</option>
-              </select>
-            </div>
+          {/* Task Type Pill Selector */}
+          <div>
+            <label className="form-label">Task Type</label>
+            <PillSelector
+              options={TASK_TYPES}
+              value={type}
+              onChange={setType}
+              colorMap={TYPE_COLORS}
+            />
+          </div>
 
-            {/* Task Priority */}
-            <div>
-              <label className="block text-xs font-semibold text-brand-textMuted uppercase mb-1">Priority</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-primary"
-              >
-                <option value="LOW" className="bg-brand-bg text-white">LOW</option>
-                <option value="MEDIUM" className="bg-brand-bg text-white">MEDIUM</option>
-                <option value="HIGH" className="bg-brand-bg text-white">HIGH</option>
-                <option value="CRITICAL" className="bg-brand-bg text-white">CRITICAL</option>
-              </select>
-            </div>
+          {/* Priority Pill Selector */}
+          <div>
+            <label className="form-label">Priority</label>
+            <PillSelector
+              options={PRIORITIES}
+              value={priority}
+              onChange={setPriority}
+              colorMap={PRIORITY_COLORS}
+            />
           </div>
 
           {/* Title */}
           <div>
-            <label className="block text-xs font-semibold text-brand-textMuted uppercase mb-1">Title</label>
+            <label className="form-label">Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Implement Oauth2 session state checks"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-primary placeholder:text-gray-600"
+              placeholder="e.g. Implement Oauth2 session validation"
+              className="glass-input w-full rounded-xl px-4 py-2.5 text-sm"
               required
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-semibold text-brand-textMuted uppercase mb-1">Description</label>
+            <label className="form-label">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe the issue or user story..."
               rows={3}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-primary placeholder:text-gray-600 resize-none"
+              className="glass-input w-full rounded-xl px-4 py-2.5 text-sm resize-none"
             />
           </div>
 
+          {/* Assignee + Hours */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Assignee */}
             <div>
-              <label className="block text-xs font-semibold text-brand-textMuted uppercase mb-1">Assignee</label>
+              <label className="form-label">Assignee</label>
               <select
                 value={assignedToId}
                 onChange={(e) => setAssignedToId(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-primary"
+                className="form-select"
                 disabled={loadingUsers}
               >
-                <option value="" className="bg-brand-bg text-white">Unassigned</option>
+                <option value="">Unassigned</option>
                 {users.map((u) => (
-                  <option key={u.id} value={u.id} className="bg-brand-bg text-white">
-                    {u.name} ({u.role})
-                  </option>
+                  <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                 ))}
               </select>
             </div>
-
-            {/* Estimated Hours */}
             <div>
-              <label className="block text-xs font-semibold text-brand-textMuted uppercase mb-1">Estimate (Hours)</label>
+              <label className="form-label">Est. Hours</label>
               <input
                 type="number"
                 min="0"
                 step="0.5"
                 value={estimatedHours}
                 onChange={(e) => setEstimatedHours(parseFloat(e.target.value) || 0)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-primary"
+                className="glass-input w-full rounded-xl px-4 py-2.5 text-sm"
               />
             </div>
           </div>
 
           {/* Tags */}
           <div>
-            <label className="block text-xs font-semibold text-brand-textMuted uppercase mb-1">Tags (Comma-separated)</label>
+            <label className="form-label">Tags (comma-separated)</label>
             <input
               type="text"
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
               placeholder="e.g. backend, security, auth"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-brand-primary placeholder:text-gray-600"
+              className="glass-input w-full rounded-xl px-4 py-2.5 text-sm"
             />
           </div>
 
-          {/* Submit Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-brand-textMuted hover:text-white rounded-lg text-sm transition-colors border border-white/5 bg-white/5 hover:bg-white/10 font-semibold"
-            >
+          {/* Actions */}
+          <div
+            className="flex items-center justify-end gap-3 pt-4"
+            style={{ borderTop: '1px solid var(--border)' }}
+          >
+            <button type="button" onClick={onClose} className="btn-ghost">
               Cancel
             </button>
             <button
               type="submit"
               disabled={createTaskMutation.isPending}
-              className="px-5 py-2 bg-gradient-to-r from-brand-primary to-indigo-600 hover:from-brand-primaryHover hover:to-indigo-700 text-white rounded-lg text-sm transition-all font-semibold shadow-glow-primary flex items-center gap-2"
+              className="btn-primary"
             >
-              {createTaskMutation.isPending && <Loader size={16} className="animate-spin" />}
-              {createTaskMutation.isPending ? 'Saving...' : 'Raise Ticket'}
+              {createTaskMutation.isPending && <Loader size={15} className="animate-spin" />}
+              {createTaskMutation.isPending ? 'Saving…' : 'Raise Ticket'}
             </button>
           </div>
         </form>

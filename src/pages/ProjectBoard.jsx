@@ -8,218 +8,248 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import TaskCard from '../components/TaskCard';
 import TicketModal from '../components/TicketModal';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  ArrowLeft, 
-  Loader, 
-  AlertCircle,
-  HelpCircle
-} from 'lucide-react';
+import { Plus, Search, Filter, ArrowLeft, Loader, AlertTriangle } from 'lucide-react';
 
 const COLUMNS = [
-  { id: 'TODO', title: 'To Do', color: 'bg-indigo-500' },
-  { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-amber-500' },
-  { id: 'IN_REVIEW', title: 'In Review', color: 'bg-cyan-500' },
-  { id: 'DONE', title: 'Done', color: 'bg-emerald-500' }
+  { id: 'TODO',        title: 'Backlog',     accent: '#94a3b8' },
+  { id: 'IN_PROGRESS', title: 'In Progress', accent: '#f59e0b' },
+  { id: 'IN_REVIEW',   title: 'In Review',   accent: '#3b82f6' },
+  { id: 'DONE',        title: 'Done',        accent: '#22c55e' },
 ];
 
 export default function ProjectBoard() {
   const { projectId } = useParams();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
 
-  // Find active project details
   const currentProject = STATIC_PROJECTS.find((p) => p.id === projectId) || {
     id: projectId,
-    name: 'Unknown Project',
-    desc: 'Custom project workspace'
+    name: 'Project Board',
+    desc: 'Custom workspace',
   };
 
-  // Fetch tasks
   const { data: tasks = [], isLoading, isError, error } = useQuery({
     queryKey: ['tasks', projectId],
     queryFn: () => tasksApi.getTasks(projectId),
   });
 
-  // Patch status mutation
   const updateStatusMutation = useMutation({
     mutationFn: ({ taskId, status }) => tasksApi.updateTaskStatus(taskId, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] }),
   });
 
-  // Handle Drag & Drop
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
-
     if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
-    // Check if item was dropped in the same spot
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
-      return;
-    }
+    const newStatus = destination.droppableId;
+    const previous = queryClient.getQueryData(['tasks', projectId]);
 
-    const newStatus = destination.droppableId; // 'TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'
-
-    // Optimistic Update
-    const previousTasks = queryClient.getQueryData(['tasks', projectId]);
-    queryClient.setQueryData(['tasks', projectId], (oldTasks) => {
-      if (!oldTasks) return [];
-      return oldTasks.map((task) =>
-        task.id === draggableId ? { ...task, status: newStatus } : task
-      );
-    });
+    // Optimistic update
+    queryClient.setQueryData(['tasks', projectId], (old) =>
+      (old || []).map((t) => t.id === draggableId ? { ...t, status: newStatus } : t)
+    );
 
     try {
       await updateStatusMutation.mutateAsync({ taskId: draggableId, status: newStatus });
-    } catch (err) {
-      // Revert if error
-      if (previousTasks) {
-        queryClient.setQueryData(['tasks', projectId], previousTasks);
-      }
+    } catch {
+      if (previous) queryClient.setQueryData(['tasks', projectId], previous);
     }
   };
 
-  // Filter and search tasks
-  const filteredTasks = tasks.filter((task) => {
-    const matchesSearch = 
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesPriority = priorityFilter === 'ALL' || task.priority === priorityFilter;
-
-    return matchesSearch && matchesPriority;
+  const filteredTasks = tasks.filter((t) => {
+    const matchSearch =
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchPriority = priorityFilter === 'ALL' || t.priority === priorityFilter;
+    return matchSearch && matchPriority;
   });
 
   return (
-    <div className="flex h-screen bg-brand-bg text-brand-text overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header title={currentProject.name} />
 
-        {/* Dashboard inner */}
-        <div className="flex-1 flex flex-col p-8 space-y-6 overflow-hidden">
-          {/* Top Bar with back link & actions */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 shrink-0">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Link to="/" className="text-brand-textMuted hover:text-white transition-colors">
-                  <ArrowLeft size={16} />
-                </Link>
-                <h2 className="text-xl font-bold text-white tracking-wide">{currentProject.name}</h2>
+        <div className="flex-1 flex flex-col overflow-hidden p-6 gap-5">
+          {/* Top action bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <Link
+                to="/"
+                className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105"
+                style={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-muted)',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <ArrowLeft size={15} />
+              </Link>
+              <div>
+                <h2 className="text-sm font-bold leading-tight" style={{ color: 'var(--text)' }}>
+                  {currentProject.name}
+                </h2>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}
+                </p>
               </div>
-              <p className="text-xs text-brand-textMuted">{currentProject.desc}</p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               {/* Search */}
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-textMuted" />
+              <div
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
+                style={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <Search size={14} style={{ color: 'var(--text-muted)' }} />
                 <input
                   type="text"
-                  placeholder="Search cards..."
+                  placeholder="Search…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-primary w-48 sm:w-60 transition-all"
+                  className="bg-transparent text-sm outline-none w-36 sm:w-48"
+                  style={{ color: 'var(--text)' }}
                 />
               </div>
 
-              {/* Priority Filter */}
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
-                <Filter size={14} className="text-brand-textMuted" />
+              {/* Priority filter */}
+              <div
+                className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                style={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <Filter size={14} style={{ color: 'var(--text-muted)' }} />
                 <select
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
-                  className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
+                  className="bg-transparent text-sm outline-none cursor-pointer font-medium"
+                  style={{ color: 'var(--text)' }}
                 >
-                  <option value="ALL" className="bg-brand-bg text-white">All Priority</option>
-                  <option value="LOW" className="bg-brand-bg text-white">LOW</option>
-                  <option value="MEDIUM" className="bg-brand-bg text-white">MEDIUM</option>
-                  <option value="HIGH" className="bg-brand-bg text-white">HIGH</option>
-                  <option value="CRITICAL" className="bg-brand-bg text-white">CRITICAL</option>
+                  {['ALL', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((p) => (
+                    <option key={p} value={p} style={{ background: 'var(--surface-solid)', color: 'var(--text)' }}>
+                      {p === 'ALL' ? 'All Priorities' : p}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              {/* Add Ticket Button */}
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-1.5 bg-gradient-to-r from-brand-primary to-indigo-600 hover:from-brand-primaryHover hover:to-indigo-700 px-4 py-2 rounded-lg text-xs font-semibold text-white shadow-glow-primary hover:shadow-glow-secondary transition-all"
-              >
+              {/* Add ticket */}
+              <button onClick={() => setIsModalOpen(true)} className="btn-primary text-sm">
                 <Plus size={16} />
                 Add Issue
               </button>
             </div>
           </div>
 
-          {/* Kanban Board Container */}
+          {/* Kanban Body */}
           {isLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <Loader size={36} className="text-brand-primary animate-spin" />
-              <p className="text-sm text-brand-textMuted font-medium">Syncing MongoDB tasks...</p>
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)' }}
+              >
+                <Loader size={24} className="animate-spin" style={{ color: '#f59e0b' }} />
+              </div>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
+                Syncing tasks from MongoDB…
+              </p>
             </div>
           ) : isError ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
-              <AlertCircle size={40} className="text-red-500" />
-              <h4 className="text-lg font-bold text-white">Failed to retrieve tasks</h4>
-              <p className="text-sm text-brand-textMuted max-w-md">
-                {error.response?.data?.detail || 'Make sure the FastAPI backend is running locally at port 8000.'}
-              </p>
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.22)' }}
+              >
+                <AlertTriangle size={24} style={{ color: '#dc2626' }} />
+              </div>
+              <div>
+                <h4 className="text-base font-bold mb-1" style={{ color: 'var(--text)' }}>Failed to Load Tasks</h4>
+                <p className="text-sm max-w-sm" style={{ color: 'var(--text-muted)' }}>
+                  {error.response?.data?.detail || 'Ensure the FastAPI server is running on port 8000.'}
+                </p>
+              </div>
             </div>
           ) : (
             <DragDropContext onDragEnd={handleDragEnd}>
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-6 overflow-x-auto pb-4">
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 overflow-x-auto pb-2 min-h-0">
                 {COLUMNS.map((col) => {
-                  const columnTasks = filteredTasks.filter((t) => t.status === col.id);
-
+                  const colTasks = filteredTasks.filter((t) => t.status === col.id);
                   return (
-                    <div 
+                    <div
                       key={col.id}
-                      className="glassmorphism rounded-xl border border-white/5 flex flex-col max-h-full min-w-[250px]"
+                      className="flex flex-col rounded-2xl min-w-[240px] min-h-0"
+                      style={{
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        boxShadow: 'var(--shadow-sm)',
+                      }}
                     >
                       {/* Column Header */}
-                      <div className="p-4 flex items-center justify-between border-b border-white/5 shrink-0">
+                      <div
+                        className="flex items-center justify-between px-4 py-3 shrink-0"
+                        style={{ borderBottom: '1px solid var(--border)' }}
+                      >
                         <div className="flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full ${col.color}`} />
-                          <span className="text-sm font-semibold text-white tracking-wide">{col.title}</span>
+                          <div
+                            className="w-2 h-2 rounded-full"
+                            style={{ background: col.accent }}
+                          />
+                          <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+                            {col.title}
+                          </span>
                         </div>
-                        <span className="bg-white/5 text-[10px] text-brand-textMuted border border-white/10 px-2 py-0.5 rounded-full font-bold">
-                          {columnTasks.length}
+                        <span
+                          className="text-xs font-bold px-2 py-0.5 rounded-lg"
+                          style={{
+                            background: `${col.accent}15`,
+                            color: col.accent,
+                            border: `1px solid ${col.accent}25`,
+                          }}
+                        >
+                          {colTasks.length}
                         </span>
                       </div>
 
-                      {/* Column Body Droppable Area */}
+                      {/* Droppable Area */}
                       <Droppable droppableId={col.id}>
                         {(provided, snapshot) => (
                           <div
                             ref={provided.innerRef}
                             {...provided.droppableProps}
-                            className={`flex-1 p-3 overflow-y-auto space-y-3 transition-colors duration-200 ${
-                              snapshot.isDraggingOver ? 'bg-white/[0.02]' : ''
-                            }`}
+                            className="flex-1 overflow-y-auto p-3 space-y-3 transition-colors duration-200"
+                            style={{
+                              background: snapshot.isDraggingOver
+                                ? `${col.accent}06`
+                                : 'transparent',
+                              minHeight: '120px',
+                            }}
                           >
-                            {columnTasks.length === 0 ? (
-                              <div className="h-full min-h-[150px] flex flex-col items-center justify-center text-center p-4 border border-dashed border-white/5 rounded-xl">
-                                <HelpCircle size={20} className="text-brand-textMuted/40 mb-1.5" />
-                                <span className="text-[11px] text-brand-textMuted/50 font-medium">Empty Column</span>
+                            {colTasks.length === 0 ? (
+                              <div
+                                className="h-24 flex flex-col items-center justify-center rounded-xl text-center"
+                                style={{
+                                  border: `1.5px dashed ${col.accent}30`,
+                                  color: 'var(--text-muted)',
+                                }}
+                              >
+                                <span className="text-xs font-medium">Empty</span>
                               </div>
                             ) : (
-                              columnTasks.map((task, idx) => (
-                                <TaskCard 
-                                  key={task.id} 
-                                  task={task} 
-                                  index={idx}
-                                />
+                              colTasks.map((task, idx) => (
+                                <TaskCard key={task.id} task={task} index={idx} />
                               ))
                             )}
                             {provided.placeholder}
@@ -235,7 +265,6 @@ export default function ProjectBoard() {
         </div>
       </div>
 
-      {/* Ticket Modal */}
       <TicketModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
