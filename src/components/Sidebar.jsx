@@ -11,6 +11,8 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 
+import logoImg from '../assets/logo.png';
+
 export const STATIC_PROJECTS = [
   { id: 'flowpilot-core', name: 'FlowPilot Core', desc: 'Core React/FastAPI workspace' },
   { id: 'ai-agent-engine', name: 'AI Engine', desc: 'DeepMind models & routing' },
@@ -65,15 +67,11 @@ export default function Sidebar() {
         className={`flex items-center gap-3 px-4 py-5 border-b transition-all duration-300`}
         style={{ borderColor: 'var(--border)' }}
       >
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-          style={{
-            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-            boxShadow: '0 4px 12px rgba(245,158,11,0.35)',
-          }}
-        >
-          <Layers size={18} className="text-stone-900" />
-        </div>
+        <img
+          src={logoImg}
+          alt="FlowPilot Logo"
+          className="w-9 h-9 object-contain shrink-0 rounded-xl"
+        />
         {!collapsed && (
           <div className="overflow-hidden">
             <h2 className="text-sm font-bold leading-tight" style={{ color: 'var(--text)' }}>

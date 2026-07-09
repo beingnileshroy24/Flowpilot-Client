@@ -5,7 +5,8 @@ import { useMutation } from '@tanstack/react-query';
 import { authApi } from '../api/auth';
 import { usersApi } from '../api/users';
 import { setCredentials } from '../store/authSlice';
-import { Layers, AlertCircle, ArrowRight, Loader } from 'lucide-react';
+import { AlertCircle, ArrowRight, Loader } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 export default function Login() {
   const dispatch = useDispatch();
@@ -90,15 +91,11 @@ export default function Login() {
 
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-            style={{
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              boxShadow: '0 8px 24px rgba(245,158,11,0.35)',
-            }}
-          >
-            <Layers size={28} className="text-stone-900" />
-          </div>
+          <img
+            src={logoImg}
+            alt="FlowPilot Logo"
+            className="w-14 h-14 object-contain mb-4 rounded-2xl"
+          />
           <h2 className="text-2xl font-bold tracking-tight mb-1" style={{ color: 'var(--text)' }}>
             Welcome back
           </h2>

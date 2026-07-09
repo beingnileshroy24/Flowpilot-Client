@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/auth';
-import { Layers, AlertCircle, CheckCircle, ArrowRight, Loader } from 'lucide-react';
+import { AlertCircle, CheckCircle, ArrowRight, Loader } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 const ROLES = [
   { value: 'DEVELOPER', label: 'Developer', desc: 'Builds & resolves tickets' },
@@ -81,15 +82,11 @@ export default function Signup() {
 
         {/* Logo */}
         <div className="flex flex-col items-center mb-7">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-            style={{
-              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-              boxShadow: '0 8px 24px rgba(245,158,11,0.35)',
-            }}
-          >
-            <Layers size={28} className="text-stone-900" />
-          </div>
+          <img
+            src={logoImg}
+            alt="FlowPilot Logo"
+            className="w-14 h-14 object-contain mb-4 rounded-2xl"
+          />
           <h2 className="text-2xl font-bold tracking-tight mb-1" style={{ color: 'var(--text)' }}>
             Create Account
           </h2>
