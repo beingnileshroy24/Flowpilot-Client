@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSelector } from 'react-redux';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { tasksApi } from '../api/tasks';
 import { projectsApi } from '../api/projects';
@@ -45,12 +46,19 @@ export default function ProjectBoard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
+  const currentUser = useSelector((state) => state.auth.user);
 
   const { data: currentProject = { name: 'Project Board', desc: '' } } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => projectsApi.getProject(projectId),
     enabled: !!projectId,
   });
+
+  const canEditProject =
+    currentUser?.role === 'MANAGER' ||
+    currentUser?.role === 'ADMIN' ||
+    currentProject?.owner_id === currentUser?.id ||
+    currentProject?.lead_developer_id === currentUser?.id;
 
   const { data: tasks = [], isLoading, isError, error } = useQuery({
     queryKey: ['tasks', projectId],
@@ -169,14 +177,16 @@ export default function ProjectBoard() {
               </div>
 
               {/* Configure Project */}
-              <button
-                onClick={() => setIsEditProjectModalOpen(true)}
-                className="btn-secondary text-sm flex items-center gap-1.5"
-                title="Configure project repository and server details"
-              >
-                <Settings size={15} />
-                Configure
-              </button>
+              {canEditProject && (
+                <button
+                  onClick={() => setIsEditProjectModalOpen(true)}
+                  className="btn-secondary text-sm flex items-center gap-1.5"
+                  title="Configure project repository and server details"
+                >
+                  <Settings size={15} />
+                  Configure
+                </button>
+              )}
 
               {/* Add ticket */}
               <button onClick={() => setIsModalOpen(true)} className="btn-primary text-sm">

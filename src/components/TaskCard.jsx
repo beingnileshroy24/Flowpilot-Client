@@ -85,6 +85,29 @@ export default function TaskCard({ task, index, onClick }) {
             </span>
           </div>
 
+          {/* Attachment Preview */}
+          {task.attachment_url && (
+            <div className="mb-2.5 rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+              {/\.(mp4|webm|ogg|mov)$/i.test(task.attachment_url) ? (
+                <div
+                  className="bg-black/10 flex items-center justify-center py-6 text-[10px] font-bold"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  🎥 Video Attachment
+                </div>
+              ) : (
+                <img
+                  src={`${import.meta.env.VITE_API_URL || ''}${task.attachment_url}`}
+                  alt="Attachment Preview"
+                  className="w-full h-24 object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = task.attachment_url;
+                  }}
+                />
+              )}
+            </div>
+          )}
+
           {/* Title */}
           <h4
             className="text-sm font-semibold leading-snug line-clamp-2 mb-1"

@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { projectsApi } from '../api/projects';
+import { usersApi } from '../api/users';
 import Modal from './Modal';
-import { AlertCircle, Loader, Link, Server, Database } from 'lucide-react';
+import { AlertCircle, Loader, Link, Server, Database, Users, Trash2 } from 'lucide-react';
 
 function GithubIcon({ size = 16, className = "" }) {
   return (
@@ -26,9 +29,13 @@ function GithubIcon({ size = 16, className = "" }) {
 
 export default function EditProjectModal({ isOpen, onClose, project }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const currentUser = useSelector((state) => state.auth.user);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedDevIds, setSelectedDevIds] = useState([]);
+  const [leadDevId, setLeadDevId] = useState('');
   const [githubFrontend, setGithubFrontend] = useState('');
   const [githubBackend, setGithubBackend] = useState('');
   const [testServer, setTestServer] = useState('');
@@ -36,11 +43,25 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
   const [testMongodbUrl, setTestMongodbUrl] = useState('');
   const [prodMongodbUrl, setProdMongodbUrl] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+  const isManagerOrAdmin = currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN';
+
+  // Fetch users list to display developers
+  const { data: users = [], isLoading: loadingUsers } = useQuery({
+    queryKey: ['users'],
+    queryFn: usersApi.listUsers,
+    enabled: isOpen,
+  });
+
+  const developers = users.filter((u) => u.role === 'DEVELOPER');
 
   useEffect(() => {
     if (isOpen && project) {
       setName(project.name || '');
       setDescription(project.description || '');
+      setSelectedDevIds(project.developer_ids || []);
+      setLeadDevId(project.lead_developer_id || '');
       setGithubFrontend(project.github_frontend || '');
       setGithubBackend(project.github_backend || '');
       setTestServer(project.test_server || '');
@@ -48,8 +69,20 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
       setTestMongodbUrl(project.test_mongodb_url || '');
       setProdMongodbUrl(project.prod_mongodb_url || '');
       setErrorMsg('');
+      setIsConfirmingDelete(false);
     }
   }, [isOpen, project]);
+
+  // Adjust lead developer selection automatically if selection changes
+  useEffect(() => {
+    if (selectedDevIds.length === 1) {
+      setLeadDevId(selectedDevIds[0]);
+    } else if (selectedDevIds.length === 0) {
+      setLeadDevId('');
+    } else if (selectedDevIds.length > 1 && !selectedDevIds.includes(leadDevId)) {
+      setLeadDevId('');
+    }
+  }, [selectedDevIds, leadDevId]);
 
   const updateProjectMutation = useMutation({
     mutationFn: projectsApi.updateProject,
@@ -63,6 +96,26 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
     },
   });
 
+  const deleteProjectMutation = useMutation({
+    mutationFn: () => projectsApi.deleteProject(project.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      onClose();
+      navigate('/');
+    },
+    onError: (err) => {
+      setErrorMsg(err.response?.data?.detail || 'Failed to delete project.');
+      setIsConfirmingDelete(false);
+    },
+  });
+
+  const handleDevCheckboxChange = (devId) => {
+    if (!isManagerOrAdmin) return;
+    setSelectedDevIds((prev) =>
+      prev.includes(devId) ? prev.filter((id) => id !== devId) : [...prev, devId]
+    );
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -70,18 +123,30 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
       setErrorMsg('Project name must be at least 2 characters.');
       return;
     }
+    if (isManagerOrAdmin && selectedDevIds.length > 1 && !leadDevId) {
+      setErrorMsg('Please designate a Lead Developer.');
+      return;
+    }
+
+    const payload = {
+      name: name.trim(),
+      description: description.trim(),
+      github_frontend: githubFrontend.trim() || null,
+      github_backend: githubBackend.trim() || null,
+      test_server: testServer.trim() || null,
+      prod_server: prodServer.trim() || null,
+      test_mongodb_url: testMongodbUrl.trim() || null,
+      prod_mongodb_url: prodMongodbUrl.trim() || null,
+    };
+
+    if (isManagerOrAdmin) {
+      payload.developer_ids = selectedDevIds;
+      payload.lead_developer_id = leadDevId || null;
+    }
+
     updateProjectMutation.mutate({
       projectId: project.id,
-      payload: {
-        name: name.trim(),
-        description: description.trim(),
-        github_frontend: githubFrontend.trim() || null,
-        github_backend: githubBackend.trim() || null,
-        test_server: testServer.trim() || null,
-        prod_server: prodServer.trim() || null,
-        test_mongodb_url: testMongodbUrl.trim() || null,
-        prod_mongodb_url: prodMongodbUrl.trim() || null,
-      },
+      payload,
     });
   };
 
@@ -130,11 +195,91 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
           </div>
         </div>
 
-        {/* Section 2: Repositories */}
+        {/* Section 2: Developer Assignments */}
         <div className="space-y-4 pt-2">
           <div className="flex items-center gap-1.5">
-            <GithubIcon size={15} className="text-blue-500" />
+            <Users size={15} className="text-blue-500" />
             <h4 className="text-xs font-bold uppercase tracking-wider text-blue-500">
+              Developer Assignments
+            </h4>
+          </div>
+          {isManagerOrAdmin ? (
+            <div className="space-y-4">
+              <div>
+                <label className="form-label">Developers</label>
+                {loadingUsers ? (
+                  <div className="text-xs text-muted flex items-center gap-1.5 py-1">
+                    <Loader size={12} className="animate-spin" /> Fetching developers...
+                  </div>
+                ) : (
+                  <div
+                    className="max-h-32 overflow-y-auto p-3 rounded-xl space-y-2"
+                    style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+                  >
+                    {developers.map((dev) => (
+                      <label key={dev.id} className="flex items-center gap-2.5 text-sm cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={selectedDevIds.includes(dev.id)}
+                          onChange={() => handleDevCheckboxChange(dev.id)}
+                          className="rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span style={{ color: 'var(--text)' }}>{dev.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {selectedDevIds.length > 1 && (
+                <div className="animate-fade-in">
+                  <label className="form-label" style={{ color: 'var(--yellow)' }}>
+                    Designate Lead Developer *
+                  </label>
+                  <select
+                    value={leadDevId}
+                    onChange={(e) => setLeadDevId(e.target.value)}
+                    className="form-select"
+                    required
+                  >
+                    <option value="">-- Choose Lead --</option>
+                    {developers
+                      .filter((d) => selectedDevIds.includes(d.id))
+                      .map((dev) => (
+                        <option key={dev.id} value={dev.id}>
+                          {dev.name} (Lead)
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-xs space-y-1.5" style={{ color: 'var(--text-muted)' }}>
+              <p>
+                <strong>Assigned Developers:</strong>{' '}
+                {selectedDevIds.length === 0
+                  ? 'None'
+                  : developers
+                      .filter((d) => selectedDevIds.includes(d.id))
+                      .map((d) => d.name)
+                      .join(', ')}
+              </p>
+              <p>
+                <strong>Lead Developer:</strong>{' '}
+                {leadDevId
+                  ? developers.find((d) => d.id === leadDevId)?.name || 'Unknown'
+                  : 'None'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Section 3: Repositories */}
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center gap-1.5">
+            <GithubIcon size={15} className="text-amber-500" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-500">
               Repository Links
             </h4>
           </div>
@@ -162,11 +307,11 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
           </div>
         </div>
 
-        {/* Section 3: Servers */}
+        {/* Section 4: Servers */}
         <div className="space-y-4 pt-2">
           <div className="flex items-center gap-1.5">
-            <Server size={15} className="text-amber-500" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-500">
+            <Server size={15} className="text-blue-500" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-500">
               Deployment Servers
             </h4>
           </div>
@@ -194,11 +339,11 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
           </div>
         </div>
 
-        {/* Section 4: MongoDB URLs */}
+        {/* Section 5: MongoDB URLs */}
         <div className="space-y-4 pt-2">
           <div className="flex items-center gap-1.5">
-            <Database size={15} className="text-blue-500" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-500">
+            <Database size={15} className="text-amber-500" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-500">
               Database URLs
             </h4>
           </div>
@@ -226,22 +371,78 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
           </div>
         </div>
 
-        {/* Submit */}
+        {/* Deletion Warning Box */}
+        {isConfirmingDelete && (
+          <div
+            className="p-4 rounded-2xl space-y-3 animate-fade-in"
+            style={{
+              background: 'rgba(239,68,68,0.08)',
+              border: '1px solid rgba(239,68,68,0.22)',
+              color: '#dc2626',
+            }}
+          >
+            <div className="font-bold flex items-center gap-1.5 text-sm">
+              <AlertCircle size={16} /> Danger: Permanent Deletion
+            </div>
+            <p className="text-xs" style={{ color: 'var(--text)' }}>
+              Are you sure you want to delete <strong>{name}</strong>? This action will permanently erase the project and all associated tasks from MongoDB. This action is irreversible.
+            </p>
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => deleteProjectMutation.mutate()}
+                disabled={deleteProjectMutation.isPending}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition-all cursor-pointer hover:scale-[1.02]"
+                style={{
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
+                }}
+              >
+                {deleteProjectMutation.isPending ? 'Deleting...' : 'Yes, Delete Project'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsConfirmingDelete(false)}
+                className="btn-ghost px-3 py-1.5 text-xs rounded-xl"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Footer Actions */}
         <div
-          className="flex items-center justify-end gap-3 pt-4"
+          className="flex items-center justify-between pt-4"
           style={{ borderTop: '1px solid var(--border)' }}
         >
-          <button type="button" onClick={onClose} className="btn-ghost">
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={updateProjectMutation.isPending}
-            className="btn-primary"
-          >
-            {updateProjectMutation.isPending && <Loader size={15} className="animate-spin" />}
-            {updateProjectMutation.isPending ? 'Updating…' : 'Save Changes'}
-          </button>
+          {/* Delete Button (MANAGER/ADMIN only) */}
+          {isManagerOrAdmin && !isConfirmingDelete ? (
+            <button
+              type="button"
+              onClick={() => setIsConfirmingDelete(true)}
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-red-500 border border-red-500/20 hover:bg-red-500/10 cursor-pointer transition-all"
+            >
+              <Trash2 size={14} />
+              Delete Project
+            </button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={onClose} className="btn-ghost">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={updateProjectMutation.isPending || isConfirmingDelete}
+              className="btn-primary"
+            >
+              {updateProjectMutation.isPending && <Loader size={15} className="animate-spin" />}
+              {updateProjectMutation.isPending ? 'Updating…' : 'Save Changes'}
+            </button>
+          </div>
         </div>
       </form>
     </Modal>

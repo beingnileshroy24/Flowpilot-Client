@@ -24,4 +24,15 @@ export const tasksApi = {
     const response = await client.patch(`/api/v1/tasks/${taskId}`, payload);
     return response.data;
   },
+
+  uploadAttachment: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await client.post('/api/v1/tasks/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };

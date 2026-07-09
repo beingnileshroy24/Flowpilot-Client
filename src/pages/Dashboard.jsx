@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
+import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { tasksApi } from '../api/tasks';
 import { projectsApi } from '../api/projects';
@@ -63,6 +64,8 @@ function MetricCard({ icon: Icon, label, value, accent, sublabel }) {
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const currentUser = useSelector((state) => state.auth.user);
+  const isManagerOrAdmin = currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN';
 
   const { data: projects = [], isLoading: isLoadingProjects } = useQuery({
     queryKey: ['projects'],
@@ -116,10 +119,12 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="flex items-center gap-2.5">
-              <button onClick={() => setIsProjectModalOpen(true)} className="btn-secondary text-sm">
-                <Plus size={16} />
-                New Project
-              </button>
+              {isManagerOrAdmin && (
+                <button onClick={() => setIsProjectModalOpen(true)} className="btn-secondary text-sm">
+                  <Plus size={16} />
+                  New Project
+                </button>
+              )}
               <button onClick={() => setIsModalOpen(true)} className="btn-primary text-sm">
                 <Plus size={16} />
                 Raise Ticket

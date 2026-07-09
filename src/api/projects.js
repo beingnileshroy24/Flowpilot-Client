@@ -20,4 +20,9 @@ export const projectsApi = {
     const response = await client.patch(`/api/v1/projects/${projectId}`, payload);
     return response.data;
   },
+
+  deleteProject: async (projectId) => {
+    const response = await client.delete(`/api/v1/projects/${projectId}`);
+    return response.data;
+  },
 };

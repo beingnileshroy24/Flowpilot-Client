@@ -64,6 +64,8 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
   const [estimatedHours, setEstimatedHours] = useState(0);
   const [tagsInput, setTagsInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { data: projects = [] } = useQuery({
     queryKey: ['projects'],
@@ -82,6 +84,8 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
       setEstimatedHours(0);
       setTagsInput('');
       setErrorMsg('');
+      setAttachmentFile(null);
+      setIsUploading(false);
     }
   }, [isOpen, defaultProjectId, projects]);
 
@@ -102,23 +106,38 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
     },
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     if (title.trim().length < 3) {
       setErrorMsg('Title must be at least 3 characters.');
       return;
     }
-    createTaskMutation.mutate({
-      project_id: projectId,
-      type,
-      title: title.trim(),
-      description: description.trim(),
-      priority,
-      assigned_to_id: assignedToId || null,
-      estimated_hours: Number(estimatedHours) || 0,
-      tags: tagsInput ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [],
-    });
+
+    try {
+      let attachmentUrl = null;
+      if (attachmentFile) {
+        setIsUploading(true);
+        const uploadRes = await tasksApi.uploadAttachment(attachmentFile);
+        attachmentUrl = uploadRes.url;
+      }
+
+      createTaskMutation.mutate({
+        project_id: projectId,
+        type,
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        assigned_to_id: assignedToId || null,
+        estimated_hours: estimatedHours,
+        tags: tagsInput.split(',').map((t) => t.trim()).filter(Boolean),
+        attachment_url: attachmentUrl,
+      });
+    } catch (err) {
+      setErrorMsg(err.response?.data?.detail || 'Failed to upload attachment file.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const canCreate = ['MANAGER', 'CLIENT', 'ADMIN'].includes(currentUser?.role);
@@ -263,6 +282,34 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
             />
           </div>
 
+          {/* Attachment (Image or Video) */}
+          <div>
+            <label className="form-label">Attachment (Image or Video)</label>
+            <div
+              className="flex items-center justify-between gap-3 p-3 rounded-xl"
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <input
+                type="file"
+                accept="image/*,video/*"
+                onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)}
+                className="text-xs w-full text-stone-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-500/10 file:text-amber-500 hover:file:bg-amber-500/20 cursor-pointer"
+              />
+              {attachmentFile && (
+                <button
+                  type="button"
+                  onClick={() => setAttachmentFile(null)}
+                  className="text-xs font-bold text-red-500 hover:underline cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Actions */}
           <div
             className="flex items-center justify-end gap-3 pt-4"
@@ -273,11 +320,11 @@ export default function TicketModal({ isOpen, onClose, defaultProjectId }) {
             </button>
             <button
               type="submit"
-              disabled={createTaskMutation.isPending}
+              disabled={createTaskMutation.isPending || isUploading}
               className="btn-primary"
             >
-              {createTaskMutation.isPending && <Loader size={15} className="animate-spin" />}
-              {createTaskMutation.isPending ? 'Saving…' : 'Raise Ticket'}
+              {(createTaskMutation.isPending || isUploading) && <Loader size={15} className="animate-spin" />}
+              {createTaskMutation.isPending || isUploading ? 'Saving…' : 'Raise Ticket'}
             </button>
           </div>
         </form>
