@@ -146,6 +146,16 @@ export default function Sidebar() {
           collapsed={collapsed}
         />
 
+        {/* My Tasks Link */}
+        <NavItem
+          to="/my-tasks"
+          icon={<Layers size={18} />}
+          label="My Tasks"
+          active={isActive('/my-tasks')}
+          collapsed={collapsed}
+          accentColor="#a855f7"
+        />
+
         {/* Projects Section */}
         {!collapsed && (
           <p

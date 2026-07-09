@@ -16,7 +16,7 @@ const TYPE_STYLES = {
   BUG:     { bg: 'rgba(239,68,68,0.10)',   text: '#dc2626', border: 'rgba(239,68,68,0.22)',  icon: Bug },
 };
 
-export default function TaskCard({ task, index, onClick, currentUser, project, projectMembers = [], onAssign }) {
+export default function TaskCard({ task, index, onClick, currentUser, project, projectMembers = [], onAssign, projectName }) {
   const priority = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.MEDIUM;
   const typeStyle = TYPE_STYLES[task.type] || TYPE_STYLES.TASK;
   const TypeIcon = typeStyle.icon;
@@ -117,6 +117,13 @@ export default function TaskCard({ task, index, onClick, currentUser, project, p
                   }}
                 />
               )}
+            </div>
+          )}
+
+          {/* Project Name Badge */}
+          {projectName && (
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider select-none" style={{ color: 'var(--yellow)' }}>
+              📁 {projectName}
             </div>
           )}
 

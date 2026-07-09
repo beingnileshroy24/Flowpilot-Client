@@ -2,9 +2,9 @@ import client from './client';
 
 export const tasksApi = {
   getTasks: async (projectId) => {
-    const response = await client.get('/api/v1/tasks/', {
-      params: { project_id: projectId },
-    });
+    const params = {};
+    if (projectId) params.project_id = projectId;
+    const response = await client.get('/api/v1/tasks/', { params });
     return response.data;
   },
 

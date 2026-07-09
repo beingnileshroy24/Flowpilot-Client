@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import ProjectBoard from './pages/ProjectBoard';
+import AssignedTasks from './pages/AssignedTasks';
 
 // Protected Route Guard
 function ProtectedRoute({ children }) {
@@ -56,6 +57,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProjectBoard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/my-tasks" 
+          element={
+            <ProtectedRoute>
+              <AssignedTasks />
             </ProtectedRoute>
           } 
         />
