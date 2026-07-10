@@ -1,5 +1,6 @@
 import React from 'react';
-import { Clock, Layers, Bug, Tag, User2 } from 'lucide-react';
+import { Clock, Layers, Bug, Tag, User2, CalendarClock, CheckSquare, FastForward } from 'lucide-react';
+import { isBefore, startOfDay, isToday } from 'date-fns';
 const PRIORITY_STYLES = {
   LOW:      { border: '#22c55e', badge: { bg: 'rgba(34,197,94,0.10)',  text: '#16a34a', border: 'rgba(34,197,94,0.20)'  } },
   MEDIUM:   { border: '#3b82f6', badge: { bg: 'rgba(59,130,246,0.10)',  text: '#2563eb', border: 'rgba(59,130,246,0.20)'  } },
@@ -144,6 +145,38 @@ export default function TaskCard({ task, onClick, currentUser, project, projectM
               {task.description}
             </p>
           )}
+
+          {/* New Metadata Row: Due Date & Checklist & Sprint */}
+          <div className="flex flex-wrap gap-2 mb-2">
+            {task.due_date && (
+              (() => {
+                const due = new Date(task.due_date);
+                const overdue = isBefore(due, startOfDay(new Date()));
+                const dueToday = isToday(due);
+                const color = overdue ? '#ef4444' : (dueToday ? '#f59e0b' : 'var(--text-muted)');
+                return (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-solid)', color, border: `1px solid ${color}40` }}>
+                    <CalendarClock size={10} />
+                    {due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </span>
+                );
+              })()
+            )}
+            
+            {task.checklist_items && task.checklist_items.length > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-solid)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                <CheckSquare size={10} className="text-blue-500" />
+                {task.checklist_items.filter(i => i.done).length}/{task.checklist_items.length}
+              </span>
+            )}
+
+            {task.sprint_id && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-solid)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                <FastForward size={10} className="text-purple-500" />
+                Sprint
+              </span>
+            )}
+          </div>
 
           {/* Footer: hours + assignee */}
           <div
