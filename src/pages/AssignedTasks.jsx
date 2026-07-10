@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
-import { DragDropContext, Droppable } from '@hello-pangea/dnd';
 import { tasksApi } from '../api/tasks';
 import { projectsApi } from '../api/projects';
 import { usersApi } from '../api/users';
@@ -57,21 +56,16 @@ export default function AssignedTasks() {
     }, {});
   }, [projects]);
 
-  const handleDragEnd = async (result) => {
-    const { destination, source, draggableId } = result;
-    if (!destination) return;
-    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
-
-    const newStatus = destination.droppableId;
+  const handleStatusChange = async (taskId, newStatus) => {
     const previous = queryClient.getQueryData(['my-tasks']);
 
     // Optimistic update
     queryClient.setQueryData(['my-tasks'], (old) =>
-      (old || []).map((t) => t.id === draggableId ? { ...t, status: newStatus } : t)
+      (old || []).map((t) => t.id === taskId ? { ...t, status: newStatus } : t)
     );
 
     try {
-      await updateStatusMutation.mutateAsync({ taskId: draggableId, status: newStatus });
+      await updateStatusMutation.mutateAsync({ taskId, status: newStatus });
     } catch {
       if (previous) queryClient.setQueryData(['my-tasks'], previous);
     }
@@ -180,107 +174,87 @@ export default function AssignedTasks() {
               </div>
             </div>
           ) : (
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 overflow-x-auto pb-2 min-h-0">
-                {COLUMNS.map((col) => {
-                  const colTasks = filteredTasks.filter((t) => t.status === col.id);
-                  return (
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 overflow-x-auto pb-2 min-h-0">
+              {COLUMNS.map((col) => {
+                const colTasks = filteredTasks.filter((t) => t.status === col.id);
+                return (
+                  <div
+                    key={col.id}
+                    className="flex flex-col rounded-2xl min-w-[240px] min-h-0 kanban-column"
+                    style={{
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      boxShadow: 'var(--shadow-sm)',
+                    }}
+                  >
+                    {/* Column Header */}
                     <div
-                      key={col.id}
-                      className="flex flex-col rounded-2xl min-w-[240px] min-h-0"
-                      style={{
-                        background: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        boxShadow: 'var(--shadow-sm)',
-                      }}
+                      className="flex items-center justify-between px-4 py-3 shrink-0"
+                      style={{ borderBottom: '1px solid var(--border)' }}
                     >
-                      {/* Column Header */}
-                      <div
-                        className="flex items-center justify-between px-4 py-3 shrink-0"
-                        style={{ borderBottom: '1px solid var(--border)' }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-2 h-2 rounded-full"
-                            style={{ background: col.accent }}
-                          />
-                          <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>
-                            {col.title}
-                          </span>
-                        </div>
-                        <span
-                          className="text-xs font-bold px-2 py-0.5 rounded-lg"
-                          style={{
-                            background: `${col.accent}15`,
-                            color: col.accent,
-                            border: `1px solid ${col.accent}25`,
-                          }}
-                        >
-                          {colTasks.length}
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ background: col.accent }}
+                        />
+                        <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+                          {col.title}
                         </span>
                       </div>
-
-                      {/* Droppable Area */}
-                      <Droppable droppableId={col.id}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className="flex-1 overflow-y-auto p-3 space-y-3 transition-colors duration-200"
-                            style={{
-                              background: snapshot.isDraggingOver
-                                ? `${col.accent}06`
-                                : 'transparent',
-                              minHeight: '120px',
-                            }}
-                          >
-                            {colTasks.length === 0 ? (
-                              <div
-                                className="h-24 flex flex-col items-center justify-center rounded-xl text-center"
-                                style={{
-                                  border: `1.5px dashed ${col.accent}30`,
-                                  color: 'var(--text-muted)',
-                                }}
-                              >
-                                <span className="text-xs font-medium">No tasks</span>
-                              </div>
-                            ) : (
-                              colTasks.map((task, idx) => {
-                                const taskProject = projectMap[task.project_id];
-                                return (
-                                  <TaskCard
-                                    key={task.id}
-                                    task={task}
-                                    index={idx}
-                                    onClick={() => setSelectedTask(task)}
-                                    currentUser={currentUser}
-                                    project={taskProject}
-                                    projectName={taskProject?.name}
-                                    projectMembers={
-                                      users.filter((u) =>
-                                        u.id === taskProject?.lead_developer_id ||
-                                        (taskProject?.developer_ids && taskProject.developer_ids.includes(u.id))
-                                      )
-                                    }
-                                    onAssign={(assignedToId) =>
-                                      updateTaskMutation.mutate({
-                                        taskId: task.id,
-                                        payload: { assigned_to_id: assignedToId || null }
-                                      })
-                                    }
-                                  />
-                                );
-                              })
-                            )}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
+                      <span
+                        className="column-count-badge text-xs font-bold px-2 py-0.5 rounded-lg"
+                        style={{
+                          background: `${col.accent}15`,
+                          color: col.accent,
+                          border: `1px solid ${col.accent}25`,
+                        }}
+                      >
+                        {colTasks.length}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
-            </DragDropContext>
+
+                    {/* Column Area */}
+                    <div
+                      className="flex-1 overflow-y-auto p-3 space-y-3 transition-colors duration-200"
+                      style={{ minHeight: '120px' }}
+                    >
+                      {colTasks.length === 0 ? (
+                        <div className="kanban-empty-state">
+                          <span className="text-xs font-medium">No tasks</span>
+                        </div>
+                      ) : (
+                        colTasks.map((task) => {
+                          const taskProject = projectMap[task.project_id];
+                          return (
+                            <TaskCard
+                              key={task.id}
+                              task={task}
+                              onClick={() => setSelectedTask(task)}
+                              currentUser={currentUser}
+                              project={taskProject}
+                              projectName={taskProject?.name}
+                              projectMembers={
+                                users.filter((u) =>
+                                  u.id === taskProject?.lead_developer_id ||
+                                  (taskProject?.developer_ids && taskProject.developer_ids.includes(u.id))
+                                )
+                              }
+                              onAssign={(assignedToId) =>
+                                updateTaskMutation.mutate({
+                                  taskId: task.id,
+                                  payload: { assigned_to_id: assignedToId || null }
+                                })
+                              }
+                              onStatusChange={handleStatusChange}
+                            />
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>

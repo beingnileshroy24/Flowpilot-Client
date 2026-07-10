@@ -95,8 +95,8 @@ export default function Dashboard() {
   });
 
   const totalTasks = projectsData.reduce((s, p) => s + p.total, 0);
-  const totalDone  = projectsData.reduce((s, p) => s + p.done, 0);
-  const totalWIP   = projectsData.reduce((s, p) => s + p.progress + p.review, 0);
+  const totalDone = projectsData.reduce((s, p) => s + p.done, 0);
+  const totalWIP = projectsData.reduce((s, p) => s + p.progress + p.review, 0);
   const totalHours = projectsData.reduce((s, p) => s + p.hours, 0);
   const overallRate = totalTasks > 0 ? Math.round((totalDone / totalTasks) * 100) : 0;
 
@@ -134,10 +134,10 @@ export default function Dashboard() {
 
           {/* Metric Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <MetricCard icon={Layers}       label="Total Tasks"   value={isLoading ? '—' : totalTasks} accent="#f59e0b" />
-            <MetricCard icon={CheckCircle2} label="Completed"     value={isLoading ? '—' : totalDone}  accent="#22c55e" sublabel={isLoading ? '' : `${overallRate}%`} />
-            <MetricCard icon={Activity}     label="Active WIP"    value={isLoading ? '—' : totalWIP}   accent="#3b82f6" />
-            <MetricCard icon={Clock}        label="Effort (hrs)"  value={isLoading ? '—' : `${totalHours}h`} accent="#a855f7" />
+            <MetricCard icon={Layers} label="Total Tasks" value={isLoading ? '—' : totalTasks} accent="#f59e0b" />
+            <MetricCard icon={CheckCircle2} label="Completed" value={isLoading ? '—' : totalDone} accent="#22c55e" sublabel={isLoading ? '' : `${overallRate}%`} />
+            <MetricCard icon={Activity} label="Active WIP" value={isLoading ? '—' : totalWIP} accent="#3b82f6" />
+            <MetricCard icon={Clock} label="Effort (hrs)" value={isLoading ? '—' : `${totalHours}h`} accent="#a855f7" />
           </div>
 
           {/* Projects Grid */}
@@ -209,8 +209,8 @@ export default function Dashboard() {
                     >
                       {[
                         { label: 'Backlog', val: proj.todo },
-                        { label: 'WIP',     val: proj.progress + proj.review },
-                        { label: 'Done',    val: proj.done },
+                        { label: 'WIP', val: proj.progress + proj.review },
+                        { label: 'Done', val: proj.done },
                       ].map((m) => (
                         <div key={m.label}>
                           <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>

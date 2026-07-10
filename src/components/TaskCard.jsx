@@ -1,12 +1,10 @@
 import React from 'react';
-import { Draggable } from '@hello-pangea/dnd';
 import { Clock, Layers, Bug, Tag, User2 } from 'lucide-react';
-
 const PRIORITY_STYLES = {
-  LOW:      { border: '#22c55e', glow: 'rgba(34,197,94,0.15)',  badge: { bg: 'rgba(34,197,94,0.10)',  text: '#16a34a', border: 'rgba(34,197,94,0.20)'  } },
-  MEDIUM:   { border: '#3b82f6', glow: 'rgba(59,130,246,0.15)', badge: { bg: 'rgba(59,130,246,0.10)',  text: '#2563eb', border: 'rgba(59,130,246,0.20)'  } },
-  HIGH:     { border: '#f59e0b', glow: 'rgba(245,158,11,0.20)', badge: { bg: 'rgba(245,158,11,0.10)',  text: '#d97706', border: 'rgba(245,158,11,0.22)'  } },
-  CRITICAL: { border: '#ef4444', glow: 'rgba(239,68,68,0.20)',  badge: { bg: 'rgba(239,68,68,0.10)',   text: '#dc2626', border: 'rgba(239,68,68,0.22)'  } },
+  LOW:      { border: '#22c55e', badge: { bg: 'rgba(34,197,94,0.10)',  text: '#16a34a', border: 'rgba(34,197,94,0.20)'  } },
+  MEDIUM:   { border: '#3b82f6', badge: { bg: 'rgba(59,130,246,0.10)',  text: '#2563eb', border: 'rgba(59,130,246,0.20)'  } },
+  HIGH:     { border: '#f59e0b', badge: { bg: 'rgba(245,158,11,0.10)',  text: '#d97706', border: 'rgba(245,158,11,0.22)'  } },
+  CRITICAL: { border: '#ef4444', badge: { bg: 'rgba(239,68,68,0.10)',   text: '#dc2626', border: 'rgba(239,68,68,0.22)'  } },
 };
 
 const TYPE_STYLES = {
@@ -16,7 +14,7 @@ const TYPE_STYLES = {
   BUG:     { bg: 'rgba(239,68,68,0.10)',   text: '#dc2626', border: 'rgba(239,68,68,0.22)',  icon: Bug },
 };
 
-export default function TaskCard({ task, index, onClick, currentUser, project, projectMembers = [], onAssign, projectName }) {
+export default function TaskCard({ task, onClick, currentUser, project, projectMembers = [], onAssign, onStatusChange, projectName }) {
   const priority = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.MEDIUM;
   const typeStyle = TYPE_STYLES[task.type] || TYPE_STYLES.TASK;
   const TypeIcon = typeStyle.icon;
@@ -35,44 +33,21 @@ export default function TaskCard({ task, index, onClick, currentUser, project, p
   }
 
   return (
-    <Draggable draggableId={task.id} index={index}>
-      {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          onClick={onClick}
-          className="select-none cursor-grab active:cursor-grabbing rounded-2xl transition-all duration-200"
-          style={{
-            ...provided.draggableProps.style,
-            background: 'var(--surface)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: `1px solid var(--border)`,
-            borderLeft: `3px solid ${priority.border}`,
-            boxShadow: snapshot.isDragging
-              ? `0 20px 40px rgba(0,0,0,0.20), 0 0 0 2px ${priority.border}40`
-              : 'var(--shadow-sm)',
-            transform: snapshot.isDragging
-              ? `${provided.draggableProps.style?.transform || ''} rotate(1.5deg) scale(1.02)`
-              : provided.draggableProps.style?.transform,
-            padding: '14px 14px 12px 12px',
-          }}
-          onMouseEnter={(e) => {
-            if (!snapshot.isDragging) {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = `var(--shadow), 0 0 16px ${priority.glow}`;
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!snapshot.isDragging) {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-            }
-          }}
-        >
-          {/* Top row: Type badge + Priority badge */}
-          <div className="flex items-center justify-between mb-2.5">
+    <div
+      onClick={onClick}
+      className="task-card"
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderLeft: `3px solid ${priority.border}`,
+        boxShadow: 'var(--shadow-sm)',
+        padding: '14px 14px 12px 16px',
+        position: 'relative',
+        cursor: 'pointer'
+      }}
+    >
+      {/* Top row: Type badge + Status & Priority */}
+      <div className="flex items-center justify-between mb-2.5">
             <span
               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-bold"
               style={{
@@ -85,16 +60,41 @@ export default function TaskCard({ task, index, onClick, currentUser, project, p
               {task.type}
             </span>
 
-            <span
-              className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-bold"
-              style={{
-                background: priority.badge.bg,
-                color: priority.badge.text,
-                border: `1px solid ${priority.badge.border}`,
-              }}
-            >
-              {task.priority}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-bold"
+                style={{
+                  background: priority.badge.bg,
+                  color: priority.badge.text,
+                  border: `1px solid ${priority.badge.border}`,
+                }}
+              >
+                {task.priority}
+              </span>
+              
+              <select
+                value={task.status}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  if (onStatusChange) {
+                    onStatusChange(task.id, e.target.value);
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg border outline-none cursor-pointer"
+                style={{
+                  background: 'var(--surface-solid)',
+                  color: 'var(--text)',
+                  borderColor: 'var(--border)'
+                }}
+                title="Update status"
+              >
+                <option value="TODO">TODO</option>
+                <option value="IN_PROGRESS">IN PROG</option>
+                <option value="IN_REVIEW">REVIEW</option>
+                <option value="DONE">DONE</option>
+              </select>
+            </div>
           </div>
 
           {/* Attachment Preview */}
@@ -233,8 +233,7 @@ export default function TaskCard({ task, index, onClick, currentUser, project, p
               )}
             </div>
           </div>
-        </div>
-      )}
-    </Draggable>
+    </div>
   );
 }
+

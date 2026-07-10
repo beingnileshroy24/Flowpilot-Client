@@ -328,16 +328,52 @@
 }
 
 /* ============================================
-   DRAG AND DROP STATES
+   TASK CARDS & KANBAN
    ============================================ */
-.dragging-card {
-  transform: rotate(2deg) scale(1.03);
-  box-shadow: 0 24px 48px rgba(0,0,0,0.20) !important;
-  z-index: 9999;
+
+/* --- Task Card Base --- */
+.task-card {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 1rem;
+  transition:
+    transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    box-shadow 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    border-color 0.2s ease;
 }
 
-.drop-zone-active {
-  background: rgba(245,158,11,0.05) !important;
-  border-color: rgba(245,158,11,0.30) !important;
-  box-shadow: inset 0 0 0 2px rgba(245,158,11,0.20);
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.10),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+
+
+/* --- Empty Column Placeholder --- */
+.kanban-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 96px;
+  border-radius: 0.75rem;
+  border: 1.5px dashed var(--border-strong);
+  color: var(--text-muted);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+
+
+/* --- Fade In Utility (reused elsewhere) --- */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease forwards;
 }
