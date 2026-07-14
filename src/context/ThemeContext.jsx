@@ -4,7 +4,9 @@ const ThemeContext = createContext({ theme: 'dark', toggleTheme: () => {} });
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('fp_theme') || 'dark';
+    const saved = localStorage.getItem('fp_theme');
+    if (saved) return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
   useEffect(() => {

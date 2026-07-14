@@ -23,6 +23,7 @@ export function useTaskDuplicateCheck(title, description, projectId) {
         });
         setSuggestions(data.matches || []);
       } catch (err) {
+        setSuggestions([]);
         setError('Failed processing matching query execution loops.');
       } finally {
         setIsSearching(false);
