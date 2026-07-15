@@ -17,10 +17,11 @@ import DecisionLog from '../components/DecisionLog';
 import RetroBoard from '../components/RetroBoard';
 import MilestoneTimeline from '../components/MilestoneTimeline';
 import WbsGeneratorPanel from '../components/WbsGeneratorPanel';
+import WorkspaceCopilot from '../components/WorkspaceCopilot';
 import { 
   Plus, Search, ArrowLeft, BookOpen,
   Code, Milestone as MilestoneIcon, FileText, GitBranch, Server, 
-  Trash2, Edit3, Save, X, Settings, Activity, Shield
+  Trash2, Edit3, Save, X, Settings, Activity, Shield, MessageSquare, Bot
 } from 'lucide-react';
 
 const COLUMNS = [
@@ -228,6 +229,7 @@ export default function ProjectBoard() {
               {[
                 { id: 'planning', label: 'Planning', icon: FileText },
                 { id: 'tasks', label: 'Tasks Board', icon: MilestoneIcon },
+                { id: 'copilot', label: 'Workspace Copilot', icon: Bot },
                 { id: 'analytics', label: 'Analytics', icon: Activity },
                 { id: 'releases', label: 'Deployments', icon: GitBranch },
                 { id: 'decisions', label: 'Decisions', icon: Shield },
@@ -402,6 +404,11 @@ export default function ProjectBoard() {
             {/* 6. RETROSPECTIVE TAB */}
             {activeTab === 'retro' && (
               <RetroBoard project={currentProject} canEdit={canEditProject} updateProjectMutation={updateProjectMutation} />
+            )}
+
+            {/* 7. WORKSPACE COPILOT TAB */}
+            {activeTab === 'copilot' && (
+              <WorkspaceCopilot projectId={projectId} project={currentProject} />
             )}
 
           </div>
