@@ -16,6 +16,7 @@ import AnalyticsTab from '../components/AnalyticsTab';
 import DecisionLog from '../components/DecisionLog';
 import RetroBoard from '../components/RetroBoard';
 import MilestoneTimeline from '../components/MilestoneTimeline';
+import WbsGeneratorPanel from '../components/WbsGeneratorPanel';
 import { 
   Plus, Search, ArrowLeft, BookOpen,
   Code, Milestone as MilestoneIcon, FileText, GitBranch, Server, 
@@ -258,6 +259,17 @@ export default function ProjectBoard() {
                       {canEditProject && <button onClick={() => isEditingReqs ? handleSaveReqs() : setIsEditingReqs(true)} className="btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1">{isEditingReqs ? <Save size={12} /> : <Edit3 size={12} />} {isEditingReqs ? 'Save' : 'Edit'}</button>}
                     </div>
                     {isEditingReqs ? <textarea value={reqsText} onChange={(e) => setReqsText(e.target.value)} rows={10} className="w-full text-sm p-3 rounded-lg border focus:outline-none" style={{ background: 'var(--surface-solid)', color: 'var(--text)', borderColor: 'var(--border)' }} /> : <div className="text-sm leading-relaxed whitespace-pre-wrap min-h-[160px]" style={{ color: 'var(--text)' }}>{currentProject.requirements || <p className="italic" style={{ color: 'var(--text-muted)' }}>No requirements defined.</p>}</div>}
+                  </div>
+                  
+                  {/* Neural Work Breakdown Engine Panel */}
+                  <div className="p-5 rounded-2xl border transition-all" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                    <WbsGeneratorPanel 
+                      projectId={projectId} 
+                      onCompleteCommit={() => {
+                        queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+                        setActiveTab('tasks');
+                      }} 
+                    />
                   </div>
                   
                   {/* Tech Stack */}
