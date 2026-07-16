@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
 import { tasksApi } from '../api/tasks';
@@ -18,6 +18,7 @@ import RetroBoard from '../components/RetroBoard';
 import MilestoneTimeline from '../components/MilestoneTimeline';
 import WbsGeneratorPanel from '../components/WbsGeneratorPanel';
 import WorkspaceCopilot from '../components/WorkspaceCopilot';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { 
   Plus, Search, ArrowLeft, BookOpen,
   Code, Milestone as MilestoneIcon, FileText, GitBranch, Server, 
@@ -34,6 +35,7 @@ const COLUMNS = [
 export default function ProjectBoard() {
   const { projectId } = useParams();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState('planning'); 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,6 +43,15 @@ export default function ProjectBoard() {
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+  const [deleteConfirmState, setDeleteConfirmState] = useState({
+    isOpen: false,
+    taskId: null,
+    taskTitle: '',
+    taskIds: [],
+    count: 1,
+    entityType: 'task'
+  });
   const currentUser = useSelector((state) => state.auth.user);
 
   const [isEditingReqs, setIsEditingReqs] = useState(false);
@@ -101,6 +112,44 @@ export default function ProjectBoard() {
     mutationFn: ({ taskId, payload }) => tasksApi.updateTaskDetails(taskId, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', projectId] }),
   });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: (taskId) => tasksApi.deleteTask(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      setSelectedTaskIds(prev => prev.filter(id => id !== taskId));
+    },
+  });
+
+  const bulkStatusMutation = useMutation({
+    mutationFn: ({ taskIds, status }) => tasksApi.bulkUpdateTaskStatus({ taskIds, status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      setSelectedTaskIds([]);
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: ({ taskIds }) => tasksApi.bulkDeleteTasks({ taskIds }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      setSelectedTaskIds([]);
+    },
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: () => projectsApi.deleteProject(projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      navigate('/');
+    },
+  });
+
+  const handleToggleSelectTask = (taskId) => {
+    setSelectedTaskIds(prev => 
+      prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
+    );
+  };
 
   const updateProjectMutation = useMutation({
     mutationFn: (payload) => projectsApi.updateProject({ projectId, payload }),
@@ -216,8 +265,24 @@ export default function ProjectBoard() {
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold leading-tight" style={{ color: 'var(--text)' }}>{currentProject.name}</h2>
                   {canEditProject && (
-                    <button onClick={() => setIsEditProjectModalOpen(true)} className="p-1 rounded-lg hover:bg-[var(--surface)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer">
+                    <button onClick={() => setIsEditProjectModalOpen(true)} className="p-1 rounded-lg hover:bg-[var(--surface)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer" title="Configure environments">
                       <Settings size={15} />
+                    </button>
+                  )}
+                  {(currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN') && (
+                    <button 
+                      onClick={() => setDeleteConfirmState({
+                        isOpen: true,
+                        taskId: null,
+                        taskTitle: currentProject.name,
+                        taskIds: [],
+                        count: 1,
+                        entityType: 'project'
+                      })}
+                      className="p-1 rounded-lg hover:bg-red-500/10 text-red-500 hover:text-red-600 transition-colors cursor-pointer"
+                      title="Delete project"
+                    >
+                      <Trash2 size={15} />
                     </button>
                   )}
                 </div>
@@ -313,12 +378,31 @@ export default function ProjectBoard() {
 
             {/* 2. TASKS BOARD TAB */}
             {activeTab === 'tasks' && (
-              <div className="flex flex-col gap-4 h-full animate-fade-in">
+              <div className="flex flex-col gap-4 h-full animate-fade-in relative pb-16">
                 <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--surface-solid)] p-3 rounded-2xl border" style={{ borderColor: 'var(--border)' }}>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
                       <Search size={13} /><input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-transparent outline-none w-32" />
                     </div>
+                    {filteredTasks.length > 0 && (
+                      <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg border hover:bg-[var(--surface-solid)] transition-all cursor-pointer text-xs font-semibold" style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}>
+                        <input
+                          type="checkbox"
+                          checked={filteredTasks.length > 0 && filteredTasks.every(t => selectedTaskIds.includes(t.id))}
+                          onChange={() => {
+                            const allFilteredIds = filteredTasks.map(t => t.id);
+                            const allSelected = allFilteredIds.every(id => selectedTaskIds.includes(id));
+                            if (allSelected) {
+                              setSelectedTaskIds(prev => prev.filter(id => !allFilteredIds.includes(id)));
+                            } else {
+                              setSelectedTaskIds(prev => [...new Set([...prev, ...allFilteredIds])]);
+                            }
+                          }}
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        Select All
+                      </label>
+                    )}
                   </div>
                   <button onClick={() => setIsModalOpen(true)} className="btn-primary text-xs py-1.5 flex items-center gap-1"><Plus size={13} /> New Ticket</button>
                 </div>
@@ -327,14 +411,122 @@ export default function ProjectBoard() {
                     const colTasks = filteredTasks.filter((t) => t.status === col.id);
                     return (
                       <div key={col.id} className="flex flex-col rounded-2xl min-w-[230px] border h-full" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-                        <div className="flex items-center justify-between px-3 py-2.5 border-b" style={{ borderColor: 'var(--border)' }}><span className="text-xs font-bold" style={{ color: col.accent }}>{col.title}</span></div>
+                        <div className="flex items-center justify-between px-3 py-2.5 border-b" style={{ borderColor: 'var(--border)' }}>
+                          <div className="flex items-center gap-2">
+                            {colTasks.length > 0 && (
+                              <input
+                                type="checkbox"
+                                checked={colTasks.every(t => selectedTaskIds.includes(t.id))}
+                                onChange={() => {
+                                  const colTaskIds = colTasks.map(t => t.id);
+                                  const allColSelected = colTaskIds.every(id => selectedTaskIds.includes(id));
+                                  if (allColSelected) {
+                                    setSelectedTaskIds(prev => prev.filter(id => !colTaskIds.includes(id)));
+                                  } else {
+                                    setSelectedTaskIds(prev => [...new Set([...prev, ...colTaskIds])]);
+                                  }
+                                }}
+                                className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                title="Select all in column"
+                              />
+                            )}
+                            <span className="text-xs font-bold" style={{ color: col.accent }}>{col.title}</span>
+                          </div>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-solid)]" style={{ color: 'var(--text-muted)' }}>{colTasks.length}</span>
+                        </div>
                         <div className="flex-1 p-2.5 space-y-2.5 overflow-y-auto">
-                          {colTasks.map((task) => <TaskCard key={task.id} task={task} onClick={() => setSelectedTask(task)} currentUser={currentUser} project={currentProject} projectMembers={projectMembers} onAssign={(a) => updateTaskMutation.mutate({ taskId: task.id, payload: { assigned_to_id: a } })} onStatusChange={handleStatusChange} />)}
+                          {colTasks.map((task) => (
+                            <TaskCard 
+                              key={task.id} 
+                              task={task} 
+                              onClick={() => setSelectedTask(task)} 
+                              currentUser={currentUser} 
+                              project={currentProject} 
+                              projectMembers={projectMembers} 
+                              onAssign={(a) => updateTaskMutation.mutate({ taskId: task.id, payload: { assigned_to_id: a } })} 
+                              onStatusChange={handleStatusChange} 
+                              isSelected={selectedTaskIds.includes(task.id)}
+                              onToggleSelect={handleToggleSelectTask}
+                              onDelete={(taskId, taskTitle) => setDeleteConfirmState({ isOpen: true, taskId, taskTitle, count: 1, taskIds: [] })}
+                            />
+                          ))}
                         </div>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Floating Bulk Actions Bar */}
+                {selectedTaskIds.length > 0 && (
+                  <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-between gap-4 px-5 py-3 rounded-2xl border backdrop-blur-md animate-slide-up shadow-2xl" 
+                       style={{ 
+                         background: 'rgba(15, 23, 42, 0.9)', 
+                         borderColor: 'rgba(255, 255, 255, 0.1)', 
+                         color: '#fff',
+                         boxShadow: '0 20px 40px -15px rgba(0,0,0,0.7)',
+                         width: 'max-content',
+                         maxWidth: '90vw'
+                       }}>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">{selectedTaskIds.length} Selected</span>
+                    </div>
+
+                    <div className="h-4 w-px bg-white/20" />
+
+                    <div className="flex items-center gap-1.5">
+                      <button 
+                        onClick={() => bulkStatusMutation.mutate({ taskIds: selectedTaskIds, status: 'TODO' })}
+                        disabled={bulkStatusMutation.isPending}
+                        className="text-[9px] uppercase font-bold px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-all border border-slate-700/50 cursor-pointer disabled:opacity-50"
+                      >
+                        To Do
+                      </button>
+                      <button 
+                        onClick={() => bulkStatusMutation.mutate({ taskIds: selectedTaskIds, status: 'IN_PROGRESS' })}
+                        disabled={bulkStatusMutation.isPending}
+                        className="text-[9px] uppercase font-bold px-2.5 py-1.5 rounded-lg bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 transition-all border border-amber-600/30 cursor-pointer disabled:opacity-50"
+                      >
+                        In Prog
+                      </button>
+                      <button 
+                        onClick={() => bulkStatusMutation.mutate({ taskIds: selectedTaskIds, status: 'IN_REVIEW' })}
+                        disabled={bulkStatusMutation.isPending}
+                        className="text-[9px] uppercase font-bold px-2.5 py-1.5 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 transition-all border border-blue-600/30 cursor-pointer disabled:opacity-50"
+                      >
+                        Review
+                      </button>
+                      <button 
+                        onClick={() => bulkStatusMutation.mutate({ taskIds: selectedTaskIds, status: 'DONE' })}
+                        disabled={bulkStatusMutation.isPending}
+                        className="text-[9px] uppercase font-bold px-2.5 py-1.5 rounded-lg bg-green-600/30 hover:bg-green-600/50 text-green-300 transition-all border border-green-600/30 cursor-pointer disabled:opacity-50"
+                      >
+                        Done
+                      </button>
+                    </div>
+
+                    <div className="h-4 w-px bg-white/20" />
+
+                    <div className="flex items-center gap-2">
+                      {(currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN') && (
+                        <button 
+                          onClick={() => setDeleteConfirmState({ isOpen: true, taskIds: selectedTaskIds, count: selectedTaskIds.length, taskId: null, taskTitle: '' })}
+                          disabled={bulkDeleteMutation.isPending}
+                          className="flex items-center gap-1 text-[9px] uppercase font-bold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 transition-all border border-red-700 cursor-pointer disabled:opacity-50"
+                        >
+                          <Trash2 size={11} />
+                          Delete
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => setSelectedTaskIds([])}
+                        className="text-[9px] uppercase font-bold px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-all border border-slate-700/50 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -429,6 +621,22 @@ export default function ProjectBoard() {
           await updateTaskMutation.mutateAsync({ taskId: selectedTask.id, payload: { assigned_to_id: a } }); 
           setSelectedTask(p => ({ ...p, assigned_to_id: a })); 
         }} 
+      />
+      <ConfirmDeleteModal
+        isOpen={deleteConfirmState.isOpen}
+        onClose={() => setDeleteConfirmState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={() => {
+          if (deleteConfirmState.entityType === 'project') {
+            deleteProjectMutation.mutate();
+          } else if (deleteConfirmState.count > 1) {
+            bulkDeleteMutation.mutate({ taskIds: deleteConfirmState.taskIds });
+          } else {
+            deleteTaskMutation.mutate(deleteConfirmState.taskId);
+          }
+        }}
+        taskTitle={deleteConfirmState.taskTitle}
+        count={deleteConfirmState.count}
+        entityType={deleteConfirmState.entityType}
       />
     </div>
   );

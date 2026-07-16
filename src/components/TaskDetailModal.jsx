@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import Modal from './Modal';
-import { Clock, Tag, User2, Calendar, FileText, CheckSquare, MessageSquare, Activity, CalendarClock } from 'lucide-react';
+import { Clock, Tag, User2, Calendar, FileText, CheckSquare, MessageSquare, Activity, CalendarClock, Trash2 } from 'lucide-react';
 import CommentThread from './CommentThread';
 import ActivityFeed from './ActivityFeed';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksApi } from '../api/tasks';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 const TYPE_COLORS = {
   TASK:    { active: '#3b82f6', bg: 'rgba(59,130,246,0.12)',  border: 'rgba(59,130,246,0.30)' },
@@ -33,6 +34,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, currentUser, pr
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('details');
   const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const typeStyle = TYPE_COLORS[task.type] || TYPE_COLORS.TASK;
   const priorityStyle = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.MEDIUM;
@@ -47,6 +49,14 @@ export default function TaskDetailModal({ isOpen, onClose, task, currentUser, pr
   const updateTaskMutation = useMutation({
     mutationFn: (payload) => tasksApi.updateTaskDetails(task.id, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => tasksApi.deleteTask(task.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      onClose();
+    },
   });
 
   const handleToggleChecklist = (index) => {
@@ -77,17 +87,29 @@ export default function TaskDetailModal({ isOpen, onClose, task, currentUser, pr
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Ticket Context" size="lg">
       <div className="flex flex-col h-[70vh] max-h-[700px]">
-        {/* Header Badges */}
-        <div className="flex flex-wrap gap-2.5 mb-4 shrink-0">
-          <span className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider" style={{ background: typeStyle.bg, color: typeStyle.active, border: `1px solid ${typeStyle.border}` }}>
-            {task.type}
-          </span>
-          <span className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider" style={{ background: priorityStyle.bg, color: priorityStyle.active, border: `1px solid ${priorityStyle.border}` }}>
-            {task.priority}
-          </span>
-          <span className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider" style={{ background: statusStyle.bg, color: statusStyle.active, border: `1px solid ${statusStyle.border}` }}>
-            {task.status.replace('_', ' ')}
-          </span>
+        {/* Header Badges & Delete Button */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 mb-4 shrink-0">
+          <div className="flex flex-wrap gap-2.5">
+            <span className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider" style={{ background: typeStyle.bg, color: typeStyle.active, border: `1px solid ${typeStyle.border}` }}>
+              {task.type}
+            </span>
+            <span className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider" style={{ background: priorityStyle.bg, color: priorityStyle.active, border: `1px solid ${priorityStyle.border}` }}>
+              {task.priority}
+            </span>
+            <span className="px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider" style={{ background: statusStyle.bg, color: statusStyle.active, border: `1px solid ${statusStyle.border}` }}>
+              {task.status.replace('_', ' ')}
+            </span>
+          </div>
+          {(currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN') && (
+            <button
+              onClick={() => setIsConfirmOpen(true)}
+              disabled={deleteMutation.isPending}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all border border-red-500/20 cursor-pointer disabled:opacity-50"
+            >
+              <Trash2 size={13} />
+              Delete Ticket
+            </button>
+          )}
         </div>
 
         <h2 className="text-xl font-bold leading-snug mb-5 shrink-0" style={{ color: 'var(--text)' }}>
@@ -308,6 +330,13 @@ export default function TaskDetailModal({ isOpen, onClose, task, currentUser, pr
 
         </div>
       </div>
+      <ConfirmDeleteModal
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        taskTitle={task.title}
+        count={1}
+      />
     </Modal>
   );
 }

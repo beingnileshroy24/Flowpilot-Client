@@ -25,6 +25,21 @@ export const tasksApi = {
     return response.data;
   },
 
+  deleteTask: async (taskId) => {
+    const response = await client.delete(`/api/v1/tasks/${taskId}`);
+    return response.data;
+  },
+
+  bulkUpdateTaskStatus: async ({ taskIds, status }) => {
+    const response = await client.post('/api/v1/tasks/bulk-status', { task_ids: taskIds, status });
+    return response.data;
+  },
+
+  bulkDeleteTasks: async ({ taskIds }) => {
+    const response = await client.post('/api/v1/tasks/bulk-delete', { task_ids: taskIds });
+    return response.data;
+  },
+
   uploadAttachment: async (file) => {
     const formData = new FormData();
     formData.append('file', file);

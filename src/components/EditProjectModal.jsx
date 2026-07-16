@@ -43,7 +43,6 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
   const [testMongodbUrl, setTestMongodbUrl] = useState('');
   const [prodMongodbUrl, setProdMongodbUrl] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const isManagerOrAdmin = currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN';
 
@@ -69,7 +68,6 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
       setTestMongodbUrl(project.test_mongodb_url || '');
       setProdMongodbUrl(project.prod_mongodb_url || '');
       setErrorMsg('');
-      setIsConfirmingDelete(false);
     }
   }, [isOpen, project]);
 
@@ -96,18 +94,6 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
     },
   });
 
-  const deleteProjectMutation = useMutation({
-    mutationFn: () => projectsApi.deleteProject(project.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      onClose();
-      navigate('/');
-    },
-    onError: (err) => {
-      setErrorMsg(err.response?.data?.detail || 'Failed to delete project.');
-      setIsConfirmingDelete(false);
-    },
-  });
 
   const handleDevCheckboxChange = (devId) => {
     if (!isManagerOrAdmin) return;
@@ -371,72 +357,18 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
           </div>
         </div>
 
-        {/* Deletion Warning Box */}
-        {isConfirmingDelete && (
-          <div
-            className="p-4 rounded-2xl space-y-3 animate-fade-in"
-            style={{
-              background: 'rgba(239,68,68,0.08)',
-              border: '1px solid rgba(239,68,68,0.22)',
-              color: '#dc2626',
-            }}
-          >
-            <div className="font-bold flex items-center gap-1.5 text-sm">
-              <AlertCircle size={16} /> Danger: Permanent Deletion
-            </div>
-            <p className="text-xs" style={{ color: 'var(--text)' }}>
-              Are you sure you want to delete <strong>{name}</strong>? This action will permanently erase the project and all associated tasks from MongoDB. This action is irreversible.
-            </p>
-            <div className="flex items-center gap-2.5 pt-1">
-              <button
-                type="button"
-                onClick={() => deleteProjectMutation.mutate()}
-                disabled={deleteProjectMutation.isPending}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition-all cursor-pointer hover:scale-[1.02]"
-                style={{
-                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                  boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
-                }}
-              >
-                {deleteProjectMutation.isPending ? 'Deleting...' : 'Yes, Delete Project'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsConfirmingDelete(false)}
-                className="btn-ghost px-3 py-1.5 text-xs rounded-xl"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Footer Actions */}
         <div
-          className="flex items-center justify-between pt-4"
+          className="flex items-center justify-end pt-4"
           style={{ borderTop: '1px solid var(--border)' }}
         >
-          {/* Delete Button (MANAGER/ADMIN only) */}
-          {isManagerOrAdmin && !isConfirmingDelete ? (
-            <button
-              type="button"
-              onClick={() => setIsConfirmingDelete(true)}
-              className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-red-500 border border-red-500/20 hover:bg-red-500/10 cursor-pointer transition-all"
-            >
-              <Trash2 size={14} />
-              Delete Project
-            </button>
-          ) : (
-            <div />
-          )}
-
           <div className="flex items-center gap-3">
             <button type="button" onClick={onClose} className="btn-ghost">
               Cancel
             </button>
             <button
               type="submit"
-              disabled={updateProjectMutation.isPending || isConfirmingDelete}
+              disabled={updateProjectMutation.isPending}
               className="btn-primary"
             >
               {updateProjectMutation.isPending && <Loader size={15} className="animate-spin" />}

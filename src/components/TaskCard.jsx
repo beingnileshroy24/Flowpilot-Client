@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Layers, Bug, Tag, User2, CalendarClock, CheckSquare, FastForward } from 'lucide-react';
+import { Clock, Layers, Bug, Tag, User2, CalendarClock, CheckSquare, FastForward, Trash2 } from 'lucide-react';
 import { isBefore, startOfDay, isToday } from 'date-fns';
 const PRIORITY_STYLES = {
   LOW:      { border: '#22c55e', badge: { bg: 'rgba(34,197,94,0.10)',  text: '#16a34a', border: 'rgba(34,197,94,0.20)'  } },
@@ -15,7 +15,19 @@ const TYPE_STYLES = {
   BUG:     { bg: 'rgba(239,68,68,0.10)',   text: '#dc2626', border: 'rgba(239,68,68,0.22)',  icon: Bug },
 };
 
-export default function TaskCard({ task, onClick, currentUser, project, projectMembers = [], onAssign, onStatusChange, projectName }) {
+export default function TaskCard({ 
+  task, 
+  onClick, 
+  currentUser, 
+  project, 
+  projectMembers = [], 
+  onAssign, 
+  onStatusChange, 
+  projectName,
+  isSelected = false,
+  onToggleSelect,
+  onDelete
+}) {
   const priority = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.MEDIUM;
   const typeStyle = TYPE_STYLES[task.type] || TYPE_STYLES.TASK;
   const TypeIcon = typeStyle.icon;
@@ -36,7 +48,7 @@ export default function TaskCard({ task, onClick, currentUser, project, projectM
   return (
     <div
       onClick={onClick}
-      className="task-card"
+      className={`task-card ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
@@ -47,19 +59,33 @@ export default function TaskCard({ task, onClick, currentUser, project, projectM
         cursor: 'pointer'
       }}
     >
-      {/* Top row: Type badge + Status & Priority */}
+      {/* Top row: Checkbox + Type badge & Status, Priority, Delete */}
       <div className="flex items-center justify-between mb-2.5">
-            <span
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-bold"
-              style={{
-                background: typeStyle.bg,
-                color: typeStyle.text,
-                border: `1px solid ${typeStyle.border}`,
-              }}
-            >
-              <TypeIcon size={11} />
-              {task.type}
-            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  if (onToggleSelect) {
+                    onToggleSelect(task.id);
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <span
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[11px] font-bold"
+                style={{
+                  background: typeStyle.bg,
+                  color: typeStyle.text,
+                  border: `1px solid ${typeStyle.border}`,
+                }}
+              >
+                <TypeIcon size={11} />
+                {task.type}
+              </span>
+            </div>
 
             <div className="flex items-center gap-1.5">
               <span
@@ -95,6 +121,19 @@ export default function TaskCard({ task, onClick, currentUser, project, projectM
                 <option value="IN_REVIEW">REVIEW</option>
                 <option value="DONE">DONE</option>
               </select>
+
+              {(currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN') && onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(task.id, task.title);
+                  }}
+                  className="p-1 rounded text-red-500 hover:bg-red-500/10 hover:text-red-600 transition-colors cursor-pointer"
+                  title="Delete task"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
             </div>
           </div>
 
