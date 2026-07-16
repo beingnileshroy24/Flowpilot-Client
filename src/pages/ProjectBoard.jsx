@@ -22,7 +22,7 @@ import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { 
   Plus, Search, ArrowLeft, BookOpen,
   Code, Milestone as MilestoneIcon, FileText, GitBranch, Server, 
-  Trash2, Edit3, Save, X, Settings, Activity, Shield, MessageSquare, Bot
+  Trash2, Edit3, Save, X, Settings, Activity, Shield, MessageSquare, Bot, Lock
 } from 'lucide-react';
 
 const COLUMNS = [
@@ -70,6 +70,8 @@ export default function ProjectBoard() {
   const [envProdServer, setEnvProdServer] = useState('');
   const [envTestMongo, setEnvTestMongo] = useState('');
   const [envProdMongo, setEnvProdMongo] = useState('');
+  const [envBackendSecrets, setEnvBackendSecrets] = useState('');
+  const [envFrontendSecrets, setEnvFrontendSecrets] = useState('');
 
   const { data: currentProject = { name: 'Project Workspace', desc: '' } } = useQuery({
     queryKey: ['project', projectId],
@@ -82,6 +84,8 @@ export default function ProjectBoard() {
       setEnvProdServer(data.prod_server || '');
       setEnvTestMongo(data.test_mongodb_url || '');
       setEnvProdMongo(data.prod_mongodb_url || '');
+      setEnvBackendSecrets(data.backend_secrets || '');
+      setEnvFrontendSecrets(data.frontend_secrets || '');
       return data;
     },
     enabled: !!projectId,
@@ -244,7 +248,9 @@ export default function ProjectBoard() {
       test_server: envTestServer,
       prod_server: envProdServer,
       test_mongodb_url: envTestMongo,
-      prod_mongodb_url: envProdMongo
+      prod_mongodb_url: envProdMongo,
+      backend_secrets: envBackendSecrets,
+      frontend_secrets: envFrontendSecrets
     });
   };
 
@@ -538,19 +544,54 @@ export default function ProjectBoard() {
             {/* 4. RELEASES & ENVIRONMENTS TAB */}
             {activeTab === 'releases' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in h-full">
-                <div className="lg:col-span-1 p-5 rounded-2xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-                  <h3 className="text-sm font-bold mb-4 flex items-center gap-2"><Server size={16} className="text-green-500" /> Server Environments</h3>
-                  <div className="space-y-4 text-xs">
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider mb-1 block">Staging Server URL</label>
-                      <input type="text" placeholder="https://..." value={envTestServer} onChange={(e) => setEnvTestServer(e.target.value)} className="glass-input w-full p-2 rounded-lg" />
+                <div className="lg:col-span-1 p-5 rounded-2xl border flex flex-col gap-4 overflow-y-auto" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                  <div>
+                    <h3 className="text-sm font-bold mb-4 flex items-center gap-2"><Server size={16} className="text-green-500" /> Server Environments</h3>
+                    <div className="space-y-4 text-xs">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider mb-1 block">Staging Server URL</label>
+                        <input type="text" placeholder="https://..." value={envTestServer} onChange={(e) => setEnvTestServer(e.target.value)} className="glass-input w-full p-2 rounded-lg" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider mb-1 block">Production Server URL</label>
+                        <input type="text" placeholder="https://..." value={envProdServer} onChange={(e) => setEnvProdServer(e.target.value)} className="glass-input w-full p-2 rounded-lg" />
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider mb-1 block">Production Server URL</label>
-                      <input type="text" placeholder="https://..." value={envProdServer} onChange={(e) => setEnvProdServer(e.target.value)} className="glass-input w-full p-2 rounded-lg" />
-                    </div>
-                    {canEditProject && <button onClick={handleSaveEnvironments} className="btn-primary w-full py-1.5 mt-2 text-xs">Save Environment Config</button>}
                   </div>
+
+                  <div className="h-px bg-white/10" />
+
+                  <div>
+                    <h3 className="text-sm font-bold mb-4 flex items-center gap-2"><Lock size={16} className="text-amber-500" /> Environment Secrets</h3>
+                    <div className="space-y-4 text-xs">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider mb-1 block">Frontend Secrets (.env format)</label>
+                        <textarea 
+                          placeholder="VITE_API_URL=https://...&#10;VITE_ANALYTICS_ID=UA-..." 
+                          value={envFrontendSecrets} 
+                          onChange={(e) => setEnvFrontendSecrets(e.target.value)} 
+                          className="glass-input w-full p-2 rounded-lg font-mono text-xs" 
+                          rows={4}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider mb-1 block">Backend Secrets (.env format)</label>
+                        <textarea 
+                          placeholder="DATABASE_URL=mongodb://...&#10;JWT_SECRET=supersecret..." 
+                          value={envBackendSecrets} 
+                          onChange={(e) => setEnvBackendSecrets(e.target.value)} 
+                          className="glass-input w-full p-2 rounded-lg font-mono text-xs" 
+                          rows={4}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {canEditProject && (
+                    <button onClick={handleSaveEnvironments} className="btn-primary w-full py-1.5 mt-2 text-xs">
+                      Save Config & Secrets
+                    </button>
+                  )}
                 </div>
                 
                 <div className="lg:col-span-2 p-5 rounded-2xl border flex flex-col h-full" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>

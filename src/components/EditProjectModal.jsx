@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { projectsApi } from '../api/projects';
 import { usersApi } from '../api/users';
 import Modal from './Modal';
-import { AlertCircle, Loader, Link, Server, Database, Users, Trash2 } from 'lucide-react';
+import { AlertCircle, Loader, Link, Server, Database, Users, Trash2, Lock } from 'lucide-react';
 
 function GithubIcon({ size = 16, className = "" }) {
   return (
@@ -42,6 +42,8 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
   const [prodServer, setProdServer] = useState('');
   const [testMongodbUrl, setTestMongodbUrl] = useState('');
   const [prodMongodbUrl, setProdMongodbUrl] = useState('');
+  const [backendSecrets, setBackendSecrets] = useState('');
+  const [frontendSecrets, setFrontendSecrets] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const isManagerOrAdmin = currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN';
@@ -67,6 +69,8 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
       setProdServer(project.prod_server || '');
       setTestMongodbUrl(project.test_mongodb_url || '');
       setProdMongodbUrl(project.prod_mongodb_url || '');
+      setBackendSecrets(project.backend_secrets || '');
+      setFrontendSecrets(project.frontend_secrets || '');
       setErrorMsg('');
     }
   }, [isOpen, project]);
@@ -123,6 +127,8 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
       prod_server: prodServer.trim() || null,
       test_mongodb_url: testMongodbUrl.trim() || null,
       prod_mongodb_url: prodMongodbUrl.trim() || null,
+      backend_secrets: backendSecrets.trim() || null,
+      frontend_secrets: frontendSecrets.trim() || null,
     };
 
     if (isManagerOrAdmin) {
@@ -352,6 +358,38 @@ export default function EditProjectModal({ isOpen, onClose, project }) {
                 onChange={(e) => setProdMongodbUrl(e.target.value)}
                 placeholder="mongodb+srv://user:pass@cluster-prod.mongodb.net"
                 className="glass-input w-full rounded-xl px-4 py-2.5 text-sm font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 6: Environment Secrets */}
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center gap-1.5">
+            <Lock size={15} className="text-amber-500" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-500">
+              Environment Secrets
+            </h4>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="form-label">Frontend Secrets (.env format)</label>
+              <textarea
+                value={frontendSecrets}
+                onChange={(e) => setFrontendSecrets(e.target.value)}
+                placeholder="VITE_API_URL=https://...&#10;VITE_ANALYTICS_ID=UA-..."
+                className="glass-input w-full rounded-xl px-4 py-2.5 text-sm font-mono"
+                rows={3}
+              />
+            </div>
+            <div>
+              <label className="form-label">Backend Secrets (.env format)</label>
+              <textarea
+                value={backendSecrets}
+                onChange={(e) => setBackendSecrets(e.target.value)}
+                placeholder="DATABASE_URL=mongodb://...&#10;JWT_SECRET=supersecret..."
+                className="glass-input w-full rounded-xl px-4 py-2.5 text-sm font-mono"
+                rows={3}
               />
             </div>
           </div>
