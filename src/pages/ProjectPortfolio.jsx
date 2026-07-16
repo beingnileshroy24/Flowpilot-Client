@@ -272,6 +272,12 @@ export default function ProjectPortfolio() {
                       <span style={{ color: 'var(--text-muted)' }}>Owner</span>
                       <span className="font-bold" style={{ color: 'var(--text)' }}>{activeProject.owner_name || activeProject.owner_id}</span>
                     </div>
+                    <div className="flex items-center justify-between text-xs p-2 rounded-lg" style={{ background: 'var(--bg)' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Created At</span>
+                      <span className="font-bold" style={{ color: 'var(--text)' }}>
+                        {activeProject.created_at ? new Date(activeProject.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                      </span>
+                    </div>
                     <div className="flex flex-col text-xs p-2 rounded-lg" style={{ background: 'var(--bg)' }}>
                       <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowDevs(!showDevs)}>
                         <span style={{ color: 'var(--text-muted)' }}>Dev Count</span>

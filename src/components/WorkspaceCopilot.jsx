@@ -15,7 +15,8 @@ export default function WorkspaceCopilot({ projectId, project }) {
       sender: 'bot',
       text: "Hello! I am your Workspace Intelligence Copilot. Ask me about blockers, sprint progress, documents, or team workloads in this project.",
       thoughts: '',
-      sources: []
+      sources: [],
+      created_at: new Date().toISOString()
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +53,8 @@ export default function WorkspaceCopilot({ projectId, project }) {
         sender: 'bot',
         text: "Hello! I am your Workspace Intelligence Copilot. Ask me about blockers, sprint progress, documents, or team workloads in this project.",
         thoughts: '',
-        sources: []
+        sources: [],
+        created_at: new Date().toISOString()
       }
     ]);
   };
@@ -96,7 +98,8 @@ export default function WorkspaceCopilot({ projectId, project }) {
 
     const userMessage = {
       sender: 'user',
-      text: queryText
+      text: queryText,
+      created_at: new Date().toISOString()
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -202,7 +205,8 @@ export default function WorkspaceCopilot({ projectId, project }) {
         sender: 'bot',
         text: localAnswer,
         thoughts: localThoughts,
-        sources: localSources
+        sources: localSources,
+        created_at: new Date().toISOString()
       }]);
       setActiveThoughts('');
       setActiveAnswer('');
@@ -214,7 +218,8 @@ export default function WorkspaceCopilot({ projectId, project }) {
         sender: 'bot',
         text: `Error: ${err.message}. Please check if the server is running.`,
         thoughts: '',
-        sources: []
+        sources: [],
+        created_at: new Date().toISOString()
       }]);
     } finally {
       setIsLoading(false);
@@ -449,6 +454,11 @@ export default function WorkspaceCopilot({ projectId, project }) {
                   ) : (
                     renderMessageTextWithCitations(m.text, m.sources)
                   )}
+                </div>
+                
+                {/* Time Indicator */}
+                <div className={`text-[9px] mt-1 px-1 ${m.sender === 'user' ? 'text-right' : 'text-left'}`} style={{ color: 'var(--text-muted)', opacity: 0.8 }}>
+                  {m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
 
                 {/* Inline Source Chips (Reference Cards) */}
