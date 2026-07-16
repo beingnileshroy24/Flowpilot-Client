@@ -24,7 +24,67 @@ export default function WorkspaceCopilot({ projectId, project }) {
   const [activeSources, setActiveSources] = useState([]);
   const [selectedSource, setSelectedSource] = useState(null);
   
+  const [chats, setChats] = useState([]);
+  const [activeChatId, setActiveChatId] = useState(null);
+  
   const messagesEndRef = useRef(null);
+
+  const fetchChats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/copilot/chats?project_id=${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('flowpilot_token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setChats(data);
+      }
+    } catch (e) {
+      console.error("Error fetching chats:", e);
+    }
+  };
+
+  const startNewChat = () => {
+    setActiveChatId(null);
+    setMessages([
+      {
+        sender: 'bot',
+        text: "Hello! I am your Workspace Intelligence Copilot. Ask me about blockers, sprint progress, documents, or team workloads in this project.",
+        thoughts: '',
+        sources: []
+      }
+    ]);
+  };
+
+  const loadChatSession = async (chatId) => {
+    setIsLoading(true);
+    setActiveChatId(chatId);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/copilot/chats/${chatId}`, {
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('flowpilot_token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.messages && data.messages.length > 0) {
+          setMessages(data.messages);
+        } else {
+          setMessages([]);
+        }
+      }
+    } catch (e) {
+      console.error("Error loading chat session:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchChats();
+    startNewChat();
+  }, [projectId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -47,18 +107,41 @@ export default function WorkspaceCopilot({ projectId, project }) {
     setActiveAnswer('');
     setActiveSources([]);
 
+    let currentChatId = activeChatId;
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/copilot/query`, {
+      // If no active session, create a new session document first
+      if (!currentChatId) {
+        const title = currentQuery.length > 35 ? currentQuery.slice(0, 35) + '...' : currentQuery;
+        const createResp = await fetch(`${API_BASE_URL}/api/v1/copilot/chats`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionStorage.getItem('flowpilot_token')}`
+          },
+          body: JSON.stringify({
+            project_id: projectId,
+            title: title
+          })
+        });
+        if (createResp.ok) {
+          const newChat = await createResp.json();
+          currentChatId = newChat._id;
+          setActiveChatId(currentChatId);
+          fetchChats();
+        } else {
+          throw new Error('Failed to create new chat session');
+        }
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/copilot/chats/${currentChatId}/query`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionStorage.getItem('flowpilot_token')}`
         },
         body: JSON.stringify({
-          prompt: currentQuery,
-          contextScope: {
-            project_id: projectId
-          }
+          prompt: currentQuery
         })
       });
 
@@ -98,7 +181,7 @@ export default function WorkspaceCopilot({ projectId, project }) {
             try {
               const parsed = JSON.parse(dataStr);
               if (parsed.thought) {
-                localThoughts += parsed.thought + '\n';
+                localThoughts += parsed.thought;
                 setActiveThoughts(localThoughts);
               } else if (parsed.chunk) {
                 localAnswer += parsed.chunk;
@@ -241,6 +324,55 @@ export default function WorkspaceCopilot({ projectId, project }) {
   return (
     <div className="flex gap-4 h-[calc(100vh-230px)] min-h-[500px]">
       
+      {/* Sidebar: Chat History */}
+      <div className="w-56 shrink-0 flex flex-col rounded-2xl border"
+        style={{
+          background: 'var(--surface)',
+          borderColor: 'var(--border)',
+          boxShadow: 'var(--shadow-sm)'
+        }}
+      >
+        <div className="p-3 border-b" style={{ borderColor: 'var(--border)' }}>
+          <button
+            onClick={startNewChat}
+            className="w-full py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold hover:bg-black/5 active:scale-95 transition-all"
+            style={{
+              borderColor: 'var(--border)',
+              color: 'var(--text)'
+            }}
+          >
+            <span>+</span> Start New Chat
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+            Recent Chats
+          </div>
+          {chats.map(c => (
+            <button
+              key={c.id}
+              onClick={() => loadChatSession(c.id)}
+              className={`w-full text-left px-3 py-2 rounded-xl text-xs truncate transition-all ${
+                activeChatId === c.id 
+                  ? 'font-bold border bg-blue-500/10 text-blue-500' 
+                  : 'hover:bg-black/5 text-slate-500'
+              }`}
+              style={{
+                borderColor: activeChatId === c.id ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
+                color: activeChatId === c.id ? '#3b82f6' : 'var(--text-muted)'
+              }}
+            >
+              💬 {c.title}
+            </button>
+          ))}
+          {chats.length === 0 && (
+            <div className="p-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+              No previous chats
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Left Area: Chat Console */}
       <div className={`flex flex-col flex-1 min-w-0 rounded-2xl border transition-all duration-300`}
         style={{
