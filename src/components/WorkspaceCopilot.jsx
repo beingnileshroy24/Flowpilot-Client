@@ -70,7 +70,15 @@ export default function WorkspaceCopilot({ projectId, project }) {
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
 
-      while (true) {
+      // Local accumulators — avoid stale closure over React state snapshots.
+      // React useState values captured inside async functions reflect the
+      // value at the time the function started, not after subsequent setState calls.
+      let localThoughts = '';
+      let localAnswer = '';
+      let localSources = [];
+      let streamDone = false;
+
+      while (!streamDone) {
         const { value, done } = await reader.read();
         if (done) break;
 
@@ -84,16 +92,20 @@ export default function WorkspaceCopilot({ projectId, project }) {
           if (trimmed.startsWith('data:')) {
             const dataStr = trimmed.slice(5).trim();
             if (dataStr === '[DONE]') {
+              streamDone = true;
               break;
             }
             try {
               const parsed = JSON.parse(dataStr);
               if (parsed.thought) {
-                setActiveThoughts(prev => prev + parsed.thought + '\n');
+                localThoughts += parsed.thought + '\n';
+                setActiveThoughts(localThoughts);
               } else if (parsed.chunk) {
-                setActiveAnswer(prev => prev + parsed.chunk);
+                localAnswer += parsed.chunk;
+                setActiveAnswer(localAnswer);
               } else if (parsed.sources) {
-                setActiveSources(parsed.sources);
+                localSources = parsed.sources;
+                setActiveSources(localSources);
               }
             } catch (e) {
               console.error('Error parsing chunk:', e);
@@ -102,12 +114,12 @@ export default function WorkspaceCopilot({ projectId, project }) {
         }
       }
 
-      // Append completed bot response to conversation list
+      // Commit completed response using local vars (not stale React state)
       setMessages(prev => [...prev, {
         sender: 'bot',
-        text: activeAnswer,
-        thoughts: activeThoughts,
-        sources: activeSources
+        text: localAnswer,
+        thoughts: localThoughts,
+        sources: localSources
       }]);
       setActiveThoughts('');
       setActiveAnswer('');
