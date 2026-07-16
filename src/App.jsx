@@ -8,6 +8,7 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import ProjectBoard from './pages/ProjectBoard';
 import AssignedTasks from './pages/AssignedTasks';
+import ProjectPortfolio from './pages/ProjectPortfolio';
 
 // Protected Route Guard
 function ProtectedRoute({ children }) {
@@ -19,6 +20,17 @@ function ProtectedRoute({ children }) {
 function PublicRoute({ children }) {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   return isAuthenticated ? <Navigate to="/" replace /> : children;
+}
+
+// Manager/Admin Route Guard
+function ManagerRoute({ children }) {
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+  const currentUser = useSelector((state) => state.auth.user);
+  const isManagerOrAdmin = currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN';
+  
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isManagerOrAdmin) return <Navigate to="/" replace />;
+  return children;
 }
 
 export default function App() {
@@ -66,6 +78,14 @@ export default function App() {
             <ProtectedRoute>
               <AssignedTasks />
             </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/portfolio" 
+          element={
+            <ManagerRoute>
+              <ProjectPortfolio />
+            </ManagerRoute>
           } 
         />
 

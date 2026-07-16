@@ -11,6 +11,7 @@ import {
   Layers,
   ChevronRight,
   ChevronLeft,
+  Briefcase,
 } from 'lucide-react';
 
 import logoImg from '../assets/logo.png';
@@ -25,6 +26,7 @@ export default function Sidebar() {
   const location = useLocation();
   const user = useSelector((state) => state.auth.user);
   const [collapsed, setCollapsed] = useState(false);
+  const isManagerOrAdmin = user?.role === 'MANAGER' || user?.role === 'ADMIN';
 
   const { data: projects = [] } = useQuery({
     queryKey: ['projects'],
@@ -155,6 +157,18 @@ export default function Sidebar() {
           collapsed={collapsed}
           accentColor="#a855f7"
         />
+
+        {/* Portfolio Link (Managers/Admins only) */}
+        {isManagerOrAdmin && (
+          <NavItem
+            to="/portfolio"
+            icon={<Briefcase size={18} />}
+            label="Portfolio"
+            active={isActive('/portfolio')}
+            collapsed={collapsed}
+            accentColor="#14b8a6"
+          />
+        )}
 
         {/* Projects Section */}
         {!collapsed && (
