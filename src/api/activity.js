@@ -10,4 +10,9 @@ export const activityApi = {
     const response = await client.get(`/api/v1/activity/`, { params: { project_id: projectId } });
     return response.data;
   },
+
+  getAllActivity: async (filters = {}) => {
+    const response = await client.get(`/api/v1/activity/`, { params: filters });
+    return response.data;
+  },
 };

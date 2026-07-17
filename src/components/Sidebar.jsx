@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { projectsApi } from '../api/projects';
+import { authApi } from '../api/auth';
 import { logout } from '../store/authSlice';
 import {
   LayoutDashboard,
@@ -12,6 +13,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Briefcase,
+  History,
 } from 'lucide-react';
 
 import logoImg from '../assets/logo.png';
@@ -33,7 +35,12 @@ export default function Sidebar() {
     queryFn: projectsApi.getProjects,
   });
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch (e) {
+      console.error("Failed to log logout activity on server", e);
+    }
     dispatch(logout());
     navigate('/login');
   };
@@ -160,14 +167,24 @@ export default function Sidebar() {
 
         {/* Portfolio Link (Managers/Admins only) */}
         {isManagerOrAdmin && (
-          <NavItem
-            to="/portfolio"
-            icon={<Briefcase size={18} />}
-            label="Portfolio"
-            active={isActive('/portfolio')}
-            collapsed={collapsed}
-            accentColor="#14b8a6"
-          />
+          <>
+            <NavItem
+              to="/portfolio"
+              icon={<Briefcase size={18} />}
+              label="Portfolio"
+              active={isActive('/portfolio')}
+              collapsed={collapsed}
+              accentColor="#14b8a6"
+            />
+            <NavItem
+              to="/activity-logs"
+              icon={<History size={18} />}
+              label="Activity Logs"
+              active={isActive('/activity-logs')}
+              collapsed={collapsed}
+              accentColor="#f59e0b"
+            />
+          </>
         )}
 
         {/* Projects Section */}

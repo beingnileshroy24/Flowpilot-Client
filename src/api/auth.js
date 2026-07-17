@@ -18,4 +18,9 @@ export const authApi = {
     const response = await client.post('/api/v1/auth/signup', payload);
     return response.data;
   },
+
+  logout: async () => {
+    const response = await client.post('/api/v1/auth/logout');
+    return response.data;
+  },
 };

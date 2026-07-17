@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import ProjectBoard from './pages/ProjectBoard';
 import AssignedTasks from './pages/AssignedTasks';
 import ProjectPortfolio from './pages/ProjectPortfolio';
+import ActivityLogs from './pages/ActivityLogs';
 
 // Protected Route Guard
 function ProtectedRoute({ children }) {
@@ -85,6 +86,14 @@ export default function App() {
           element={
             <ManagerRoute>
               <ProjectPortfolio />
+            </ManagerRoute>
+          } 
+        />
+        <Route 
+          path="/activity-logs" 
+          element={
+            <ManagerRoute>
+              <ActivityLogs />
             </ManagerRoute>
           } 
         />
