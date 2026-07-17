@@ -83,17 +83,22 @@ export default function ProjectHealthTab({ projectId, project }) {
     );
   }
 
-  // Extract variables for rendering, falling back to specs if not present
-  const sprintTitle = activeSprint?.title || "Sprint 12";
-  const failureRate = sprintPred?.failure_rate !== undefined ? sprintPred.failure_rate : 0.84;
-  const failureLikelihood = Math.round(failureRate * 100);
+  // Extract variables for rendering - no fake fallbacks, only real data or null
+  const sprintTitle = activeSprint?.title || null;
+  const failureRate = sprintPred?.failure_rate !== undefined ? sprintPred.failure_rate : null;
+  const failureLikelihood = failureRate !== null ? Math.round(failureRate * 100) : null;
+  const hasSprintData = failureRate !== null;
   
   // Glowing indicators based on score: 0.0 - 0.4 green, 0.41 - 0.7 amber, > 0.71 high-risk amber border + blinking dots
   let sprintStatusColor = 'var(--text-muted)';
   let sprintThemeClass = '';
-  let riskStatusText = 'LOW RISK';
+  let riskStatusText = 'NO DATA';
   
-  if (failureRate <= 0.40) {
+  if (!hasSprintData) {
+    sprintStatusColor = 'var(--text-muted)';
+    sprintThemeClass = '';
+    riskStatusText = 'NO SPRINT DATA';
+  } else if (failureRate <= 0.40) {
     sprintStatusColor = '#22c55e'; // Green
     sprintThemeClass = 'border-green-500/30 bg-green-500/5 text-green-500';
     riskStatusText = 'HEALTHY PROFILE';
@@ -107,38 +112,37 @@ export default function ProjectHealthTab({ projectId, project }) {
     riskStatusText = 'HIGH RISK PROFILE';
   }
 
-  // Delay calculation: mock +4 days if high, +2 if warning, 0 if healthy, or use custom rule
-  const delayDays = failureRate > 0.70 ? 4 : (failureRate > 0.40 ? 2 : 0);
+  // Delay calculation based on real failure rate
+  const delayDays = failureRate !== null ? (failureRate > 0.70 ? 4 : (failureRate > 0.40 ? 2 : 0)) : null;
 
-  // Unplanned scope creep points
+  // Unplanned scope creep points - only from real sprint prediction
   const scopeCreepPoints = sprintPred?.unplanned_scope_creep_points !== undefined 
     ? sprintPred.unplanned_scope_creep_points 
-    : 12;
+    : null;
 
   // Workload Bottleneck calculations
   // Find highest workload dev from assignee_burnout_risks
   const devRisks = health.assignee_burnout_risks || [];
   const highestWorkloadDev = devRisks.length > 0 
     ? devRisks.reduce((prev, current) => (prev.workload_balance > current.workload_balance) ? prev : current)
-    : { name: "Alex R.", workload_balance: 1.8 };
+    : null;
   
-  const bottleneckDevName = highestWorkloadDev.name;
-  const bottleneckCapacityPct = Math.round(highestWorkloadDev.workload_balance * 100);
+  const bottleneckDevName = highestWorkloadDev?.name || null;
+  const bottleneckCapacityPct = highestWorkloadDev ? Math.round(highestWorkloadDev.workload_balance * 100) : null;
 
-  // SHAP weights breakdown calculations (dynamic or fallback to exact spec values)
-  const driftVal = sprintPred?.historical_velocity_drift !== undefined ? sprintPred.historical_velocity_drift : 5.0;
-  const scopeCreepVal = scopeCreepPoints;
-  const devWorkloadVal = highestWorkloadDev.workload_balance;
-
-  const shapWeights = {
-    unplanned_scope_creep_points: 0.15 * scopeCreepVal,
-    assignee_workload_balance: 0.15 * devWorkloadVal,
+  // SHAP weights breakdown calculations (only from real data)
+  const driftVal = sprintPred?.historical_velocity_drift !== undefined ? sprintPred.historical_velocity_drift : null;
+  const shapWeights = (driftVal !== null && scopeCreepPoints !== null && highestWorkloadDev) ? {
+    unplanned_scope_creep_points: 0.15 * scopeCreepPoints,
+    assignee_workload_balance: 0.15 * highestWorkloadDev.workload_balance,
     historical_velocity_drift: 0.25 * driftVal
-  };
+  } : null;
   
-  const totalShap = Math.abs(shapWeights.unplanned_scope_creep_points) + 
-                    Math.abs(shapWeights.assignee_workload_balance) + 
-                    Math.abs(shapWeights.historical_velocity_drift);
+  const totalShap = shapWeights
+    ? Math.abs(shapWeights.unplanned_scope_creep_points) + 
+      Math.abs(shapWeights.assignee_workload_balance) + 
+      Math.abs(shapWeights.historical_velocity_drift)
+    : 0;
 
   const getShapPercentage = (weight) => {
     if (totalShap === 0) return 33;
@@ -193,19 +197,19 @@ export default function ProjectHealthTab({ projectId, project }) {
           
           {/* Main Diagnostic Dashboard Panel */}
           <div 
-            onClick={() => setSelectedCard('sprint')}
-            className={`p-6 rounded-2xl border transition-all duration-300 cursor-pointer group ${sprintThemeClass}`}
+            onClick={() => hasSprintData ? setSelectedCard('sprint') : undefined}
+            className={`p-6 rounded-2xl border transition-all duration-300 ${hasSprintData ? 'cursor-pointer group' : 'cursor-default'} ${sprintThemeClass}`}
             style={{ 
               background: 'var(--surface)',
-              borderColor: failureRate > 0.70 ? '#f59e0b' : 'var(--border)'
+              borderColor: (hasSprintData && failureRate > 0.70) ? '#f59e0b' : 'var(--border)'
             }}
           >
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-2 text-xs font-semibold tracking-wider uppercase opacity-85">
                 <TrendingUp size={14} />
-                <span>Active Interval: {sprintTitle}</span>
+                <span>{sprintTitle ? `Active Interval: ${sprintTitle}` : 'Sprint Analysis'}</span>
               </div>
-              {failureRate > 0.71 && (
+              {hasSprintData && failureRate > 0.71 && (
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 border border-amber-500/30 text-amber-500 animate-pulse">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
                   ALERT CONFIGURATION
@@ -221,67 +225,94 @@ export default function ProjectHealthTab({ projectId, project }) {
                 </div>
                 <div className="text-lg md:text-xl font-black flex items-center gap-2" style={{ color: 'var(--text)' }}>
                   <AlertTriangle className="shrink-0" size={22} style={{ color: sprintStatusColor }} />
-                  <span>{riskStatusText} ({failureLikelihood}% Failure Likelihood)</span>
+                  {hasSprintData
+                    ? <span>{riskStatusText} ({failureLikelihood}% Failure Likelihood)</span>
+                    : <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>No active sprint found for this project.</span>
+                  }
                 </div>
               </div>
 
               {/* Expected Delay */}
-              <div className="pt-2 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.05)' }}>
-                <div className="text-xs uppercase font-bold tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>
-                  Target Completion Date:
+              {hasSprintData && (
+                <div className="pt-2 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.05)' }}>
+                  <div className="text-xs uppercase font-bold tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>
+                    Target Completion Date:
+                  </div>
+                  <div className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text)' }}>
+                    <Clock className="text-blue-500" size={16} />
+                    <span>
+                      {delayDays > 0 
+                        ? `Expected Delay of +${delayDays} Days Beyond Baseline` 
+                        : 'On Track with Baseline Schedule'}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text)' }}>
-                  <Clock className="text-blue-500" size={16} />
-                  <span>
-                    {delayDays > 0 
-                      ? `Expected Delay of +${delayDays} Days Beyond Baseline` 
-                      : 'On Track with Baseline Schedule'}
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
 
-            <div className="mt-5 flex items-center justify-between text-xs font-bold text-blue-500 group-hover:underline">
-              <span>View contributing factors & SHAP weights</span>
-              <ChevronRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
-            </div>
+            {hasSprintData && (
+              <div className="mt-5 flex items-center justify-between text-xs font-bold text-blue-500 group-hover:underline">
+                <span>View contributing factors & SHAP weights</span>
+                <ChevronRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            )}
           </div>
 
           {/* Pipeline Alerts Section */}
           <div className="p-6 rounded-2xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-            <div className="flex items-center gap-2 text-sm font-black mb-4 text-red-500">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-              CRITICAL PIPELINE ALERT
+            <div className="flex items-center gap-2 text-sm font-black mb-4" style={{ color: (scopeCreepPoints !== null && scopeCreepPoints > 0) || bottleneckDevName ? '#ef4444' : 'var(--text-muted)' }}>
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: (scopeCreepPoints !== null && scopeCreepPoints > 0) || bottleneckDevName ? '#ef4444' : 'var(--text-muted)', animation: (scopeCreepPoints !== null && scopeCreepPoints > 0) || bottleneckDevName ? 'pulse 1.5s infinite' : 'none' }} />
+              {(scopeCreepPoints !== null && scopeCreepPoints > 0) || bottleneckDevName ? 'CRITICAL PIPELINE ALERT' : 'PIPELINE ALERTS'}
             </div>
 
             <div className="space-y-4">
               {/* Alert 1: Scope Creep */}
-              <div className="flex items-start gap-3 p-3.5 rounded-xl border border-red-500/10 bg-red-500/5">
-                <AlertCircle className="text-red-500 shrink-0 mt-0.5" size={16} />
-                <div>
-                  <div className="text-xs font-extrabold text-red-400">Scope Creep Impact</div>
-                  <div className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text)' }}>
-                    {scopeCreepPoints} story points added mid-sprint.
+              {scopeCreepPoints !== null ? (
+                <div className="flex items-start gap-3 p-3.5 rounded-xl border border-red-500/10 bg-red-500/5">
+                  <AlertCircle className="text-red-500 shrink-0 mt-0.5" size={16} />
+                  <div>
+                    <div className="text-xs font-extrabold text-red-400">Scope Creep Impact</div>
+                    <div className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text)' }}>
+                      {scopeCreepPoints} story points added mid-sprint.
+                    </div>
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                      exceeds sprint buffers and increases velocity drift indexes.
+                    </p>
                   </div>
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                    exceeds sprint buffers and increases velocity drift indexes.
-                  </p>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-start gap-3 p-3.5 rounded-xl border border-gray-500/10 bg-gray-500/5">
+                  <CheckCircle2 className="text-gray-500 shrink-0 mt-0.5" size={16} />
+                  <div>
+                    <div className="text-xs font-extrabold" style={{ color: 'var(--text-muted)' }}>No Scope Creep Detected</div>
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>No active sprint or scope data available.</p>
+                  </div>
+                </div>
+              )}
 
               {/* Alert 2: Bottleneck */}
-              <div className="flex items-start gap-3 p-3.5 rounded-xl border border-yellow-500/10 bg-yellow-500/5">
-                <User className="text-yellow-500 shrink-0 mt-0.5" size={16} />
-                <div>
-                  <div className="text-xs font-extrabold text-yellow-400">Workload Bottleneck</div>
-                  <div className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text)' }}>
-                    Developer {bottleneckDevName} carries {bottleneckCapacityPct}% task capacity.
+              {bottleneckDevName ? (
+                <div className="flex items-start gap-3 p-3.5 rounded-xl border border-yellow-500/10 bg-yellow-500/5">
+                  <User className="text-yellow-500 shrink-0 mt-0.5" size={16} />
+                  <div>
+                    <div className="text-xs font-extrabold text-yellow-400">Workload Bottleneck</div>
+                    <div className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text)' }}>
+                      Developer {bottleneckDevName} carries {bottleneckCapacityPct}% task capacity.
+                    </div>
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                      exceeds safety threshold of 120%, creating an active task delay bottleneck.
+                    </p>
                   </div>
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                    exceeds safety threshold of 120%, creating an active task delay bottleneck.
-                  </p>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-start gap-3 p-3.5 rounded-xl border border-gray-500/10 bg-gray-500/5">
+                  <CheckCircle2 className="text-gray-500 shrink-0 mt-0.5" size={16} />
+                  <div>
+                    <div className="text-xs font-extrabold" style={{ color: 'var(--text-muted)' }}>No Workload Issues</div>
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>No developer workload data recorded for this project.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -453,68 +484,76 @@ export default function ProjectHealthTab({ projectId, project }) {
               </div>
 
               {/* SHAP Weight Breakdown */}
-              <div className="space-y-4">
-                <h4 className="text-xs uppercase font-black tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  Top Driving Factor Weights (SHAP Intercepts)
-                </h4>
-                
+              {shapWeights ? (
                 <div className="space-y-4">
-                  {/* Factor 1: Scope Creep */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span style={{ color: 'var(--text)' }}>1. unplanned_scope_creep_points</span>
-                      <span className="text-red-500 font-bold">+{shapWeights.unplanned_scope_creep_points.toFixed(2)} Risk</span>
+                  <h4 className="text-xs uppercase font-black tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Top Driving Factor Weights (SHAP Intercepts)
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    {/* Factor 1: Scope Creep */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span style={{ color: 'var(--text)' }}>1. unplanned_scope_creep_points</span>
+                        <span className="text-red-500 font-bold">+{shapWeights.unplanned_scope_creep_points.toFixed(2)} Risk</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
+                        <div className="h-full bg-red-500 rounded-full" style={{ width: `${getShapPercentage(shapWeights.unplanned_scope_creep_points)}%` }} />
+                      </div>
                     </div>
-                    <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
-                      <div className="h-full bg-red-500 rounded-full" style={{ width: `${getShapPercentage(shapWeights.unplanned_scope_creep_points)}%` }} />
-                    </div>
-                  </div>
 
-                  {/* Factor 2: Workload Balance */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span style={{ color: 'var(--text)' }}>2. assignee_workload_balance ({bottleneckDevName})</span>
-                      <span className="text-yellow-500 font-bold">+{shapWeights.assignee_workload_balance.toFixed(2)} Risk</span>
+                    {/* Factor 2: Workload Balance */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span style={{ color: 'var(--text)' }}>2. assignee_workload_balance ({bottleneckDevName})</span>
+                        <span className="text-yellow-500 font-bold">+{shapWeights.assignee_workload_balance.toFixed(2)} Risk</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
+                        <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${getShapPercentage(shapWeights.assignee_workload_balance)}%` }} />
+                      </div>
                     </div>
-                    <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
-                      <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${getShapPercentage(shapWeights.assignee_workload_balance)}%` }} />
-                    </div>
-                  </div>
 
-                  {/* Factor 3: Velocity Drift */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span style={{ color: 'var(--text)' }}>3. historical_velocity_drift</span>
-                      <span className="text-blue-500 font-bold">+{shapWeights.historical_velocity_drift.toFixed(2)} Risk</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${getShapPercentage(shapWeights.historical_velocity_drift)}%` }} />
+                    {/* Factor 3: Velocity Drift */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span style={{ color: 'var(--text)' }}>3. historical_velocity_drift</span>
+                        <span className="text-blue-500 font-bold">+{shapWeights.historical_velocity_drift.toFixed(2)} Risk</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${getShapPercentage(shapWeights.historical_velocity_drift)}%` }} />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-3 rounded-xl text-xs italic text-center" style={{ color: 'var(--text-muted)', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                  SHAP weights are unavailable. No sprint prediction data exists for this project.
+                </div>
+              )}
 
               {/* Historical Metrics Evidence */}
-              <div className="space-y-3 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-                <h4 className="text-xs uppercase font-black tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  Target Historical Metrics Evidence
-                </h4>
-                
-                <ul className="space-y-2.5 text-xs font-semibold">
-                  <li className="flex items-start gap-2" style={{ color: 'var(--text)' }}>
-                    <span className="text-blue-500 shrink-0 mt-0.5">•</span>
-                    <span>
-                      Velocity Average: {failureRate > 0.70 ? 24 : 20} points targeted vs {failureRate > 0.70 ? 14 : 18} points delivered.
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2" style={{ color: 'var(--text)' }}>
-                    <span className="text-blue-500 shrink-0 mt-0.5">•</span>
-                    <span>
-                      Active Tasks Blocked: {failureRate > 0.70 ? 4 : 1} critical database component tasks.
-                    </span>
-                  </li>
-                </ul>
-              </div>
+              {shapWeights ? (
+                <div className="space-y-3 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+                  <h4 className="text-xs uppercase font-black tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Target Historical Metrics Evidence
+                  </h4>
+                  
+                  <ul className="space-y-2.5 text-xs font-semibold">
+                    <li className="flex items-start gap-2" style={{ color: 'var(--text)' }}>
+                      <span className="text-blue-500 shrink-0 mt-0.5">•</span>
+                      <span>Velocity Drift: {driftVal.toFixed(2)} (computed from sprint history)</span>
+                    </li>
+                    <li className="flex items-start gap-2" style={{ color: 'var(--text)' }}>
+                      <span className="text-blue-500 shrink-0 mt-0.5">•</span>
+                      <span>Scope Creep: {scopeCreepPoints} unplanned story points mid-sprint.</span>
+                    </li>
+                  </ul>
+                </div>
+              ) : (
+                <div className="space-y-3 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+                  <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No historical sprint metrics available. Add tasks and an active sprint to generate sprint-level predictions.</p>
+                </div>
+              )}
 
               {/* Rationale and mitigation text block */}
               {thoughtProcessText && (
