@@ -18,11 +18,12 @@ import RetroBoard from '../components/RetroBoard';
 import MilestoneTimeline from '../components/MilestoneTimeline';
 import WbsGeneratorPanel from '../components/WbsGeneratorPanel';
 import WorkspaceCopilot from '../components/WorkspaceCopilot';
+import ProjectHealthTab from '../components/ProjectHealthTab';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { 
   Plus, Search, ArrowLeft, BookOpen,
   Code, Milestone as MilestoneIcon, FileText, GitBranch, Server, 
-  Trash2, Edit3, Save, X, Settings, Activity, Shield, MessageSquare, Bot, Lock
+  Trash2, Edit3, Save, X, Settings, Activity, Shield, MessageSquare, Bot, Lock, HeartPulse
 } from 'lucide-react';
 
 const COLUMNS = [
@@ -301,6 +302,7 @@ export default function ProjectBoard() {
                 { id: 'planning', label: 'Planning', icon: FileText },
                 { id: 'tasks', label: 'Tasks Board', icon: MilestoneIcon },
                 { id: 'copilot', label: 'Workspace Copilot', icon: Bot },
+                { id: 'health', label: 'Project Health', icon: HeartPulse },
                 { id: 'analytics', label: 'Analytics', icon: Activity },
                 { id: 'releases', label: 'Deployments', icon: GitBranch },
                 { id: 'decisions', label: 'Decisions', icon: Shield },
@@ -642,6 +644,11 @@ export default function ProjectBoard() {
             {/* 7. WORKSPACE COPILOT TAB */}
             {activeTab === 'copilot' && (
               <WorkspaceCopilot projectId={projectId} project={currentProject} />
+            )}
+
+            {/* 8. PROJECT HEALTH DIAGNOSTIC TAB */}
+            {activeTab === 'health' && (
+              <ProjectHealthTab projectId={projectId} project={currentProject} />
             )}
 
           </div>
