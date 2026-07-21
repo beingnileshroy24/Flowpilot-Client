@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Bot, AlertTriangle, ArrowRight, ArrowLeft, CheckCircle2, User, Play } from 'lucide-react';
 import { plannerApi } from '../api/planner';
 
-export default function AiSprintPlanner({ projectId, sprints, onPlanCommitted }) {
+export default function SprintPlanner({ projectId, sprints, onPlanCommitted }) {
   const [selectedSprintId, setSelectedSprintId] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
@@ -58,11 +58,9 @@ export default function AiSprintPlanner({ projectId, sprints, onPlanCommitted })
   };
 
   const moveToSprint = (task) => {
-    // If moved back, we need an assignee. For simulation, let's just assign it to the first available dev, 
-    // or ideally the user could select. We'll assign it to the first dev for now.
     const devIds = Object.keys(planData?.dev_capacities || {});
     const fallbackDevId = devIds.length > 0 ? devIds[0] : 'unassigned';
-    const fallbackDevName = fallbackDevId !== 'unassigned' ? "Developer" : "Unassigned"; // Best effort fallback
+    const fallbackDevName = fallbackDevId !== 'unassigned' ? "Developer" : "Unassigned";
     
     setSimulatedDropped(prev => prev.filter(t => t.task_id !== task.task_id));
     setSimulatedAssignments(prev => [...prev, { ...task, assigned_to: fallbackDevId, assignee_name: fallbackDevName }]);
@@ -73,7 +71,6 @@ export default function AiSprintPlanner({ projectId, sprints, onPlanCommitted })
     setSimulatedDropped(prev => [...prev, task]);
   };
 
-  // Group assignments by developer
   const swimlanes = useMemo(() => {
     const groups = {};
     simulatedAssignments.forEach(t => {
@@ -92,7 +89,6 @@ export default function AiSprintPlanner({ projectId, sprints, onPlanCommitted })
 
   const checkBrokenDependencies = (task) => {
     if (!task.dependency_ids || task.dependency_ids.length === 0) return false;
-    // Check if any of its dependencies are in the dropped list (meaning they aren't included in the sprint)
     const droppedIds = new Set(simulatedDropped.map(t => t.task_id));
     return task.dependency_ids.some(depId => droppedIds.has(depId));
   };
@@ -160,7 +156,6 @@ export default function AiSprintPlanner({ projectId, sprints, onPlanCommitted })
                     <span className="text-[10px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Priority: {task.priority}</span>
                     <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded text-gray-400">{task.estimated_hours}h</span>
                   </div>
-                  {/* Tooltip implementation via group-hover overlay */}
                   <div className="absolute top-full left-0 mt-1 w-full p-2 bg-black/90 text-[10px] text-white rounded opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition-opacity">
                     Rationale: Deferred due to insufficient developer capacity or high burnout risk.
                   </div>
@@ -189,7 +184,6 @@ export default function AiSprintPlanner({ projectId, sprints, onPlanCommitted })
                   const capacity = (planData?.dev_capacities && planData.dev_capacities[devId]) || 40.0;
                   const loadPercentage = Math.min(100, Math.round((data.totalPoints / capacity) * 100));
                   
-                  // Heat bar colors
                   let heatColor = 'bg-green-500';
                   if (loadPercentage > 75) heatColor = 'bg-yellow-500';
                   if (loadPercentage > 90) heatColor = 'bg-red-500';
@@ -205,7 +199,6 @@ export default function AiSprintPlanner({ projectId, sprints, onPlanCommitted })
                         </span>
                       </div>
                       
-                      {/* Capacity Visualization Heat Bar */}
                       <div className="w-full h-1.5 bg-black/10 rounded-full overflow-hidden">
                         <div className={`h-full ${heatColor} transition-all duration-300`} style={{ width: `${loadPercentage}%` }} />
                       </div>
@@ -241,7 +234,6 @@ export default function AiSprintPlanner({ projectId, sprints, onPlanCommitted })
               </div>
             </div>
 
-            {/* Explainability Sidebar */}
             <div className="w-1/3 border rounded-xl p-4 flex flex-col" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
               <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: 'var(--text)' }}>
                 <Bot size={16} className="text-purple-500" /> AI Copilot Context

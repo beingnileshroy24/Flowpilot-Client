@@ -20,7 +20,7 @@ import WbsGeneratorPanel from '../components/WbsGeneratorPanel';
 import WorkspaceCopilot from '../components/WorkspaceCopilot';
 import ProjectHealthTab from '../components/ProjectHealthTab';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
-import AiSprintPlanner from '../components/AiSprintPlanner';
+import SprintPlanner from './SprintPlanner';
 import { 
   Plus, Search, ArrowLeft, BookOpen,
   Code, Milestone as MilestoneIcon, FileText, GitBranch, Server, 
@@ -327,7 +327,7 @@ export default function ProjectBoard() {
             {/* AI PLANNER TAB */}
             {activeTab === 'ai-planner' && (
               <div className="h-full">
-                <AiSprintPlanner 
+                <SprintPlanner 
                   projectId={projectId} 
                   sprints={currentProject.sprints || []}
                   onPlanCommitted={() => {
