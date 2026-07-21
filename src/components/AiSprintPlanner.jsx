@@ -109,17 +109,31 @@ export default function AiSprintPlanner({ projectId, sprints, onPlanCommitted })
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <select 
-            value={selectedSprintId} 
-            onChange={(e) => setSelectedSprintId(e.target.value)}
-            className="glass-input text-xs px-3 py-2 rounded-lg"
+          {sprints && sprints.length > 0 ? (
+            <select 
+              value={selectedSprintId} 
+              onChange={(e) => setSelectedSprintId(e.target.value)}
+              className="glass-input text-xs px-3 py-2 rounded-lg"
+            >
+              {sprints.map(s => (
+                <option key={s.id} value={s.id}>{s.title} ({s.status})</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs px-3 py-2 rounded-lg border italic" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'var(--bg)' }}>
+              No sprints — create one in Planning tab
+            </span>
+          )}
+          <button
+            onClick={handleGeneratePlan}
+            disabled={isGenerating || !selectedSprintId}
+            className="btn-primary text-xs py-2 px-4 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {sprints.map(s => (
-              <option key={s.id} value={s.id}>{s.title} ({s.status})</option>
-            ))}
-          </select>
-          <button onClick={handleGeneratePlan} disabled={isGenerating} className="btn-primary text-xs py-2 px-4 flex items-center gap-2">
-            {isGenerating ? 'Computing Matrix...' : <><Play size={14} /> Generate Optimal Plan</>}
+            {isGenerating ? (
+              <><span className="inline-block w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Computing Matrix...</>
+            ) : (
+              <><Play size={14} /> Generate Optimal Plan</>
+            )}
           </button>
         </div>
       </div>
@@ -172,7 +186,7 @@ export default function AiSprintPlanner({ projectId, sprints, onPlanCommitted })
 
               <div className="flex-1 overflow-y-auto pr-2 space-y-6">
                 {Object.entries(swimlanes).map(([devId, data]) => {
-                  const capacity = planData.dev_capacities[devId] || 40.0;
+                  const capacity = (planData?.dev_capacities && planData.dev_capacities[devId]) || 40.0;
                   const loadPercentage = Math.min(100, Math.round((data.totalPoints / capacity) * 100));
                   
                   // Heat bar colors
