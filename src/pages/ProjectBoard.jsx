@@ -20,10 +20,11 @@ import WbsGeneratorPanel from '../components/WbsGeneratorPanel';
 import WorkspaceCopilot from '../components/WorkspaceCopilot';
 import ProjectHealthTab from '../components/ProjectHealthTab';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
+import AiSprintPlanner from '../components/AiSprintPlanner';
 import { 
   Plus, Search, ArrowLeft, BookOpen,
   Code, Milestone as MilestoneIcon, FileText, GitBranch, Server, 
-  Trash2, Edit3, Save, X, Settings, Activity, Shield, MessageSquare, Bot, Lock, HeartPulse
+  Trash2, Edit3, Save, X, Settings, Activity, Shield, MessageSquare, Bot, Lock, HeartPulse, Brain
 } from 'lucide-react';
 
 const COLUMNS = [
@@ -300,6 +301,7 @@ export default function ProjectBoard() {
             <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto hide-scrollbar" style={{ background: 'var(--surface-solid)', border: '1px solid var(--border)' }}>
               {[
                 { id: 'planning', label: 'Planning', icon: FileText },
+                { id: 'ai-planner', label: 'AI Planner', icon: Brain },
                 { id: 'tasks', label: 'Tasks Board', icon: MilestoneIcon },
                 { id: 'copilot', label: 'Workspace Copilot', icon: Bot },
                 { id: 'health', label: 'Project Health', icon: HeartPulse },
@@ -320,9 +322,22 @@ export default function ProjectBoard() {
             </div>
           </div>
 
-          {/* Main Tab Content Area */}
           <div className="flex-1 min-h-0 overflow-y-auto pb-4 pr-1 relative">
             
+            {/* AI PLANNER TAB */}
+            {activeTab === 'ai-planner' && (
+              <div className="h-full">
+                <AiSprintPlanner 
+                  projectId={projectId} 
+                  sprints={currentProject.sprints || []}
+                  onPlanCommitted={() => {
+                    queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+                    setActiveTab('tasks');
+                  }}
+                />
+              </div>
+            )}
+
             {/* 1. PLANNING TAB */}
             {activeTab === 'planning' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">

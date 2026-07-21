@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { tasksApi } from '../api/tasks';
 import { projectsApi } from '../api/projects';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
+import AdvancedSearchModal from '../components/AdvancedSearchModal';
 import {
   FolderKanban,
   CheckCircle2,
@@ -15,12 +15,12 @@ import {
   Database,
   Key,
   Users,
-  Code2,
   Clock,
   ArrowRight,
-  ShieldAlert,
   ChevronRight,
-  Globe
+  Globe,
+  Search,
+  SlidersHorizontal
 } from 'lucide-react';
 
 function GithubIcon({ size = 16, className = "" }) {
@@ -48,6 +48,20 @@ const PROJECT_ACCENT_COLORS = ['#f59e0b', '#3b82f6', '#a855f7', '#ec4899', '#14b
 export default function ProjectPortfolio() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [showDevs, setShowDevs] = useState(false);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({
+    text: '',
+    techs: [],
+    owner: '',
+    developer: '',
+    minRate: '',
+    maxRate: '',
+    minTasks: '',
+    maxTasks: '',
+    minHours: '',
+    maxHours: '',
+    sortBy: 'name-asc'
+  });
   
   const { data: projects = [], isLoading: isLoadingProjects } = useQuery({
     queryKey: ['projects'],
@@ -77,7 +91,101 @@ export default function ProjectPortfolio() {
     return { ...proj, total, done, progress, review, todo, hours, rate, accent };
   });
 
-  const activeProject = projectsData.find(p => p.id === selectedProject?.id);
+  const filteredProjects = projectsData.filter((proj) => {
+    if (activeFilters.text) {
+      const q = activeFilters.text.toLowerCase();
+      const matchName = proj.name?.toLowerCase().includes(q);
+      const matchDesc = proj.description?.toLowerCase().includes(q);
+      if (!matchName && !matchDesc) return false;
+    }
+    if (activeFilters.techs.length > 0) {
+      const projectTechs = proj.tech_stack || [];
+      const hasAllTechs = activeFilters.techs.every(t => projectTechs.includes(t));
+      if (!hasAllTechs) return false;
+    }
+    if (activeFilters.owner) {
+      if (proj.owner_name !== activeFilters.owner && proj.owner_id !== activeFilters.owner) {
+        return false;
+      }
+    }
+    if (activeFilters.developer) {
+      const devNames = proj.developer_names || [];
+      if (!devNames.includes(activeFilters.developer)) return false;
+    }
+    if (activeFilters.minRate !== '') {
+      if (proj.rate < Number(activeFilters.minRate)) return false;
+    }
+    if (activeFilters.maxRate !== '') {
+      if (proj.rate > Number(activeFilters.maxRate)) return false;
+    }
+    if (activeFilters.minTasks !== '') {
+      if (proj.total < Number(activeFilters.minTasks)) return false;
+    }
+    if (activeFilters.maxTasks !== '') {
+      if (proj.total > Number(activeFilters.maxTasks)) return false;
+    }
+    if (activeFilters.minHours !== '') {
+      if (proj.hours < Number(activeFilters.minHours)) return false;
+    }
+    if (activeFilters.maxHours !== '') {
+      if (proj.hours > Number(activeFilters.maxHours)) return false;
+    }
+    return true;
+  });
+
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    switch (activeFilters.sortBy) {
+      case 'name-asc':
+        return a.name.localeCompare(b.name);
+      case 'name-desc':
+        return b.name.localeCompare(a.name);
+      case 'rate-desc':
+        return b.rate - a.rate;
+      case 'rate-asc':
+        return a.rate - b.rate;
+      case 'tasks-desc':
+        return b.total - a.total;
+      case 'hours-desc':
+        return b.hours - a.hours;
+      case 'date-desc':
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      case 'date-asc':
+        return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+      default:
+        return 0;
+    }
+  });
+
+  const activeProject = sortedProjects.find(p => p.id === selectedProject?.id);
+
+  const activeFiltersCount = [
+    activeFilters.techs.length > 0,
+    activeFilters.owner !== '',
+    activeFilters.developer !== '',
+    activeFilters.minRate !== '',
+    activeFilters.maxRate !== '',
+    activeFilters.minTasks !== '',
+    activeFilters.maxTasks !== '',
+    activeFilters.minHours !== '',
+    activeFilters.maxHours !== '',
+    activeFilters.sortBy !== 'name-asc',
+  ].filter(Boolean).length;
+
+  const clearAllFilters = () => {
+    setActiveFilters({
+      text: '',
+      techs: [],
+      owner: '',
+      developer: '',
+      minRate: '',
+      maxRate: '',
+      minTasks: '',
+      maxTasks: '',
+      minHours: '',
+      maxHours: '',
+      sortBy: 'name-asc'
+    });
+  };
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
@@ -90,18 +198,84 @@ export default function ProjectPortfolio() {
           
           {/* Main List Area */}
           <div className="flex-1 overflow-y-auto pr-2 space-y-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--text)' }}>
-                Project Portfolio
-              </h2>
-              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                Managerial overview of all ongoing projects and their operational metrics.
-              </p>
+            <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--text)' }}>
+                  Project Portfolio
+                </h2>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Managerial overview of all ongoing projects and their operational metrics.
+                </p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-5">
-              {projectsData.map((proj) => (
-                <div
+            {/* Search and Filters Bar */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Search projects by name or description..."
+                  value={activeFilters.text}
+                  onChange={(e) => setActiveFilters(prev => ({ ...prev, text: e.target.value }))}
+                  className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
+                  style={{
+                    background: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text)',
+                  }}
+                />
+              </div>
+              <button
+                onClick={() => setIsAdvancedOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                style={{
+                  background: 'var(--surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text)',
+                }}
+              >
+                <SlidersHorizontal size={16} />
+                <span className="hidden sm:inline">Advanced Search</span>
+                {activeFiltersCount > 0 && (
+                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-amber-500 text-white" style={{ background: 'var(--yellow)', color: 'var(--text-on-yellow)' }}>
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </button>
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="text-xs font-semibold hover:underline cursor-pointer"
+                  style={{ color: '#ef4444' }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {sortedProjects.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-16 border border-dashed rounded-2xl" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+                <FolderKanban className="w-12 h-12 mb-4 opacity-40" style={{ color: 'var(--text-muted)' }} />
+                <h3 className="text-base font-bold" style={{ color: 'var(--text)' }}>No projects matched your criteria</h3>
+                <p className="text-xs mt-1 mb-5" style={{ color: 'var(--text-muted)' }}>
+                  Try adjusting your filters or search query to find what you are looking for.
+                </p>
+                <button
+                  onClick={clearAllFilters}
+                  className="px-4 py-2 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer"
+                  style={{
+                    background: 'var(--yellow)',
+                    color: 'var(--text-on-yellow)',
+                  }}
+                >
+                  Clear All Filters
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-5">
+                {sortedProjects.map((proj) => (
+                  <div
                   key={proj.id}
                   onClick={() => { setSelectedProject(proj); setShowDevs(false); }}
                   className="rounded-2xl p-5 flex flex-col transition-all duration-300 cursor-pointer group relative overflow-hidden"
@@ -193,6 +367,7 @@ export default function ProjectPortfolio() {
                 </div>
               ))}
             </div>
+            )}
           </div>
 
           {/* Side Panel (Details Preview) */}
@@ -374,6 +549,14 @@ export default function ProjectPortfolio() {
           )}
         </main>
       </div>
+
+      <AdvancedSearchModal
+        isOpen={isAdvancedOpen}
+        onClose={() => setIsAdvancedOpen(false)}
+        filters={activeFilters}
+        onApply={setActiveFilters}
+        projects={projectsData}
+      />
     </div>
   );
 }
